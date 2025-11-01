@@ -12,22 +12,17 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 40px 20px;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+   margin: 0;
+  padding: 0;
+  background-color: var(--bg-light);
+  color: var(--text-dark);
 }
 
 h1 {
@@ -47,12 +42,40 @@ button {
   transition: border-color 0.25s;
 }
 button:hover {
-  border-color: #646cff;
+  opacity: 0.9;
+  transform: translateY(-1px);
 }
+
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
+
+input {
+  padding: 10px;
+  margin: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--primary-color);
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin: 15px 0;
+  transition: var(--transition);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
 
 @media (prefers-color-scheme: light) {
   :root {
@@ -65,4 +88,91 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* NAVBAR STYLING */
+
+/* Main navbar container */
+.navbar {
+  background-color: #1e1e2f;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Logo section */
+.navbar-logo {
+  color: #61dafb;
+  font-size: 1.3rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* Links container */
+.navbar-links {
+  display: flex;
+  gap: 20px;
+}
+
+/* Individual links */
+.navbar-links a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: color 0.2s ease, border-bottom 0.2s ease;
+}
+
+/* Hover and active states */
+.navbar-links a:hover {
+  color: #61dafb;
+}
+
+.navbar-links .active {
+  color: #61dafb;
+  border-bottom: 2px solid #61dafb;
+  padding-bottom: 2px;
+}
+
+/* Optional: Responsive design */
+@media (max-width: 600px) {
+  .navbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar-links {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+}
+
+/* Hover Effect */
+.navbar-links a {
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: 500;
+  position: relative;
+}
+
+.navbar-links a::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  width: 0%;
+  height: 2px;
+  background-color: #61dafb;
+  transition: width 0.3s ease;
+}
+
+.navbar-links a:hover::after,
+.navbar-links .active::after {
+  width: 100%;
 }

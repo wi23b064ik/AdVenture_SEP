@@ -40,3 +40,14 @@
 .read-the-docs {
   color: #888;
 }
+
+/* added styling*/
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f7f7f7;
+  color: #333;
+}
+input, button {
+  margin: 5px;
+  padding: 8px;
+} 
