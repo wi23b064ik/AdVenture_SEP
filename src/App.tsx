@@ -1,9 +1,13 @@
+//all visual components and routing  is handled here
+
 // Import necessary modules from react-router-dom for routing 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 // Import adv page component and show route.
 import AdvertiserPage from "./pages/AdvertiserPage";
 import HomePage from "./pages/HomePage";
 import PublisherPage from "./pages/PublisherPage";
+import BiddingPage from "./pages/BiddingPage";
+
 //root react component: App.tsx - entry point for the application
 function App() {
   return (
@@ -15,6 +19,7 @@ function App() {
         <Route path="/advertiser" element={<AdvertiserPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/publisher" element={<PublisherPage />} />
+        <Route path="/bidding" element={<BiddingPage />} />
       </Routes>
     </Router>
   );
