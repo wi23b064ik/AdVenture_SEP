@@ -5,7 +5,9 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-logo"> AdVenture </div>
+      
       <div className="navbar-links">
+        {/* Hauptnavigation */}
         <NavLink to="/" className={({ isActive }) => (isActive ? "active" : "")}>
           Home
         </NavLink>
@@ -26,6 +28,21 @@ export default function Navbar() {
           className={({ isActive }) => (isActive ? "active" : "")}
         >
           Bidding
+        </NavLink>
+
+        {/* --- Authentifizierung (Neu) --- */}
+        {/* Optional: Du könntest hier im CSS margin-left hinzufügen, um diese Gruppe abzutrennen */}
+        <NavLink
+          to="/login"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          Login
+        </NavLink>
+        <NavLink
+          to="/register"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          Registrieren
         </NavLink>
       </div>
     </nav>
