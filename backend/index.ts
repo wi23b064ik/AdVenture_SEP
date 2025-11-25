@@ -44,7 +44,7 @@ app.post('/api/login', async (req, res) => {
       message: 'Login erfolgreich',
       id: user.id,
       username: user.username,
-      role: user.rolle
+      role: user.role
     });
   } catch (error) {
     console.error('Login-Fehler:', error);
@@ -100,6 +100,27 @@ app.post('/api/register', async (req, res) => {
   } catch (error) {
     console.error('Register-Fehler:', error);
     return res.status(500).json({ message: 'Serverfehler bei der Registrierung.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// ==========================================
+// 3. ADMIN ROUTE: Alle Benutzer holen
+// ==========================================
+app.get('/api/users', async (req, res) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+
+    // Wir holen alle wichtigen Infos (aber NICHT das Passwort!)
+    const query = 'SELECT id, username, email, role, firstname, lastname, salutation FROM users';
+    const [rows] = await connection.execute<RowDataPacket[]>(query);
+
+    return res.status(200).json(rows);
+  } catch (error) {
+    console.error('Fehler beim Abrufen der Benutzer:', error);
+    return res.status(500).json({ message: 'Serverfehler.' });
   } finally {
     if (connection) await connection.end();
   }
