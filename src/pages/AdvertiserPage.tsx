@@ -1,60 +1,478 @@
-//useState to keep track of changes made by user
 import { useState } from "react";
 
-//Define bid object 
-interface Bid {
-  id: number;
-  adSpace: string;
-  amount: number;
+interface Campaign {
+  id: string;
+  name: string;
+  budget: number;
+  dailyBudget: number;
+  startDate: string;
+  endDate: string;
+  targetCategories: string[];
+  targetCountries: string[];
+  targetDevices: string[];
+  creativeHeadline: string;
+  creativeDescription: string;
+  landingUrl: string;
+  status: "draft" | "active" | "paused";
 }
 
-//funct called when user goes to advertiser page ( http://localhost:5174/advertiser)
-export default function AdvertiserPage() { //export default = mvp component
-  const [bids, setBids] = useState<Bid[]>([]); 
-  const [adSpace, setAdSpace] = useState(""); 
-  const [amount, setAmount] = useState("");
+interface CampaignBid {
+  id: string;
+  campaignId: string;
+  adSpaceId: string;
+  adSpaceName: string;
+  bidAmountCPM: number; // Cost per 1000 impressions
+  bidTime: Date;
+  status: "pending" | "won" | "lost";
+  impressions?: number;
+  totalCost?: number;
+}
 
-  //creates new bid with given details 
-  const placeBid = () => {
-    if (!adSpace || !amount) return;
-    const newBid: Bid = {
-      id: Date.now(),
-      adSpace,
-      amount: parseFloat(amount),
+export default function AdvertiserPage() {
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [bids, setBids] = useState<CampaignBid[]>([]);
+  const [showCampaignForm, setShowCampaignForm] = useState(false);
+
+  const [campaignForm, setCampaignForm] = useState({
+    name: "",
+    budget: 1000,
+    dailyBudget: 50,
+    startDate: "",
+    endDate: "",
+    targetCategories: ["Technology"],
+    targetCountries: ["DE"],
+    targetDevices: ["desktop"],
+    creativeHeadline: "",
+    creativeDescription: "",
+    landingUrl: "",
+  });
+
+  const [bidForm, setBidForm] = useState({
+    campaignId: "",
+    adSpaceId: "space_1",
+    adSpaceName: "Homepage Banner",
+    bidAmountCPM: 2.5,
+  });
+
+  const handleCampaignChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setCampaignForm({
+      ...campaignForm,
+      [name]: name === "budget" || name === "dailyBudget" || name === "bidAmountCPM" 
+        ? parseFloat(value) 
+        : value,
+    });
+  };
+
+  const handleBidChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setBidForm({
+      ...bidForm,
+      [name]: name === "bidAmountCPM" ? parseFloat(value) : value,
+    });
+  };
+
+  const createCampaign = () => {
+    if (!campaignForm.name) {
+      alert("Please enter a campaign name");
+      return;
+    }
+    const newCampaign: Campaign = {
+      id: Date.now().toString(),
+      ...campaignForm,
+      status: "draft",
     };
-    //update bids array with new bid
+    setCampaigns([...campaigns, newCampaign]);
+    setCampaignForm({
+      name: "",
+      budget: 1000,
+      dailyBudget: 50,
+      startDate: "",
+      endDate: "",
+      targetCategories: ["Technology"],
+      targetCountries: ["DE"],
+      targetDevices: ["desktop"],
+      creativeHeadline: "",
+      creativeDescription: "",
+      landingUrl: "",
+    });
+    setShowCampaignForm(false);
+  };
+
+  const placeBid = () => {
+    if (!bidForm.campaignId) {
+      alert("Please select a campaign");
+      return;
+    }
+    const newBid: CampaignBid = {
+      id: Date.now().toString(),
+      campaignId: bidForm.campaignId,
+      adSpaceId: bidForm.adSpaceId,
+      adSpaceName: bidForm.adSpaceName,
+      bidAmountCPM: bidForm.bidAmountCPM,
+      bidTime: new Date(),
+      status: "pending",
+    };
     setBids([...bids, newBid]);
-    //reset input fields
-    setAdSpace("");
-    setAmount("");
-  };    
+    setBidForm({
+      campaignId: "",
+      adSpaceId: "space_1",
+      adSpaceName: "Homepage Banner",
+      bidAmountCPM: 2.5,
+    });
+  };
 
-  //visual layout
+  const activateCampaign = (id: string) => {
+    setCampaigns(
+      campaigns.map((c) =>
+        c.id === id ? { ...c, status: "active" as const } : c
+      )
+    );
+  };
+
   return (
-    <div style={{ padding: "20px" }}>
+    <div style={styles.container}>
       <h2>Advertiser Portal</h2>
-      <p>Enter bids for available ad spaces.</p>
-      <input
-        placeholder="Ad Space Name"
-        value={adSpace}
-        onChange={(e) => setAdSpace(e.target.value)}
-      />
-      <input
-        placeholder="Bid Amount (€)"
-        type="number"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-      />
-      <button onClick={placeBid}>Place Bid</button>
+      <p>Create campaigns and place bids on available ad spaces (OpenRTB-based).</p>
 
-      <h3>Your Bids</h3>
-      <ul>
-        {bids.map((b) => (
-          <li key={b.id}>
-            {b.adSpace}: €{b.amount.toFixed(2)}
-          </li>
-        ))}
-      </ul>
+      {/* Campaigns Section */}
+      <div style={styles.section}>
+        <div style={styles.sectionHeader}>
+          <h3>Campaigns</h3>
+          <button onClick={() => setShowCampaignForm(!showCampaignForm)} style={styles.button}>
+            {showCampaignForm ? "Cancel" : "Create Campaign"}
+          </button>
+        </div>
+
+        {showCampaignForm && (
+          <div style={styles.formSection}>
+            <h4>New Campaign</h4>
+            <div style={styles.formGrid}>
+              <div style={styles.formGroup}>
+                <label>Campaign Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="e.g., Spring Product Launch"
+                  value={campaignForm.name}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Total Budget (€)</label>
+                <input
+                  type="number"
+                  name="budget"
+                  value={campaignForm.budget}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Daily Budget (€)</label>
+                <input
+                  type="number"
+                  name="dailyBudget"
+                  value={campaignForm.dailyBudget}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Start Date</label>
+                <input
+                  type="date"
+                  name="startDate"
+                  value={campaignForm.startDate}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>End Date</label>
+                <input
+                  type="date"
+                  name="endDate"
+                  value={campaignForm.endDate}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Target Categories</label>
+                <select name="targetCategories" onChange={handleCampaignChange} style={styles.input}>
+                  <option>Technology</option>
+                  <option>Fashion</option>
+                  <option>Finance</option>
+                  <option>Gaming</option>
+                </select>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Target Countries</label>
+                <select name="targetCountries" onChange={handleCampaignChange} style={styles.input}>
+                  <option value="DE">Germany</option>
+                  <option value="AT">Austria</option>
+                  <option value="CH">Switzerland</option>
+                  <option value="EU">All EU</option>
+                </select>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label>Target Devices</label>
+                <select name="targetDevices" onChange={handleCampaignChange} style={styles.input}>
+                  <option value="desktop">Desktop</option>
+                  <option value="mobile">Mobile</option>
+                  <option value="tablet">Tablet</option>
+                </select>
+              </div>
+
+              <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
+                <label>Creative Headline</label>
+                <input
+                  type="text"
+                  name="creativeHeadline"
+                  placeholder="e.g., Discover Amazing Deals"
+                  value={campaignForm.creativeHeadline}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
+                <label>Creative Description</label>
+                <input
+                  type="text"
+                  name="creativeDescription"
+                  placeholder="Describe your product or offer"
+                  value={campaignForm.creativeDescription}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
+                <label>Landing URL</label>
+                <input
+                  type="url"
+                  name="landingUrl"
+                  placeholder="https://example.com"
+                  value={campaignForm.landingUrl}
+                  onChange={handleCampaignChange}
+                  style={styles.input}
+                />
+              </div>
+            </div>
+            <button onClick={createCampaign} style={styles.button}>
+              Create Campaign
+            </button>
+          </div>
+        )}
+
+        <div style={styles.grid}>
+          {campaigns.map((campaign) => (
+            <div key={campaign.id} style={styles.card}>
+              <div style={styles.cardHeader}>
+                <h4>{campaign.name}</h4>
+                <span style={campaign.status === "active" ? styles.activeBadge : styles.badge}>
+                  {campaign.status.toUpperCase()}
+                </span>
+              </div>
+              <p><strong>Budget:</strong> €{campaign.budget} (€{campaign.dailyBudget}/day)</p>
+              <p><strong>Headline:</strong> {campaign.creativeHeadline}</p>
+              <p><strong>Target:</strong> {campaign.targetCountries.join(", ")}</p>
+              <div style={styles.cardActions}>
+                {campaign.status === "draft" && (
+                  <button onClick={() => activateCampaign(campaign.id)} style={styles.secondaryButton}>
+                    Activate
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bidding Section */}
+      <div style={styles.section}>
+        <h3>Place Bids</h3>
+        <div style={styles.formSection}>
+          <div style={styles.formGrid}>
+            <div style={styles.formGroup}>
+              <label>Select Campaign *</label>
+              <select
+                name="campaignId"
+                value={bidForm.campaignId}
+                onChange={handleBidChange}
+                style={styles.input}
+              >
+                <option value="">-- Choose Campaign --</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label>Ad Space</label>
+              <select name="adSpaceName" onChange={handleBidChange} style={styles.input}>
+                <option value="Homepage Banner">Homepage Banner (728x90)</option>
+                <option value="Sidebar Ad">Sidebar Ad (300x250)</option>
+                <option value="Video Pre-roll">Video Pre-roll (16:9)</option>
+                <option value="Native Ad">Native Ad</option>
+              </select>
+            </div>
+
+            <div style={styles.formGroup}>
+              <label>Bid Amount (€ CPM)</label>
+              <input
+                type="number"
+                step="0.1"
+                name="bidAmountCPM"
+                value={bidForm.bidAmountCPM}
+                onChange={handleBidChange}
+                style={styles.input}
+              />
+              <small style={{ color: "#9ca3af" }}>Cost per 1000 impressions</small>
+            </div>
+          </div>
+          <button onClick={placeBid} style={styles.button}>
+            Place Bid
+          </button>
+        </div>
+
+        <h4>Bid History</h4>
+        {bids.length === 0 ? (
+          <p style={styles.emptyState}>No bids placed yet.</p>
+        ) : (
+          <div style={styles.bidTable}>
+            {bids.map((bid) => (
+              <div key={bid.id} style={styles.bidRow}>
+                <div>
+                  <p><strong>{bid.adSpaceName}</strong></p>
+                  <p style={styles.smallText}>Campaign: {campaigns.find(c => c.id === bid.campaignId)?.name}</p>
+                </div>
+                <div style={styles.bidDetails}>
+                  <p><strong>€{bid.bidAmountCPM.toFixed(2)} CPM</strong></p>
+                  <p style={bid.status === "won" ? styles.wonBadge : styles.smallText}>
+                    {bid.status.toUpperCase()}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const styles: { [key: string]: React.CSSProperties } = {
+  container: { padding: "20px", maxWidth: "1200px", margin: "0 auto" },
+  section: { marginBottom: "40px" },
+  sectionHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
+  formSection: {
+    backgroundColor: "#f9fafb",
+    padding: "20px",
+    borderRadius: "8px",
+    marginBottom: "20px",
+    border: "1px solid #e5e7eb",
+  },
+  formGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+    gap: "15px",
+    marginBottom: "15px",
+  },
+  formGroup: {
+    display: "flex",
+    flexDirection: "column",
+  },
+  input: {
+    padding: "8px",
+    border: "1px solid #d1d5db",
+    borderRadius: "4px",
+    fontSize: "0.9rem",
+  },
+  button: {
+    backgroundColor: "#2563eb",
+    color: "white",
+    padding: "10px 20px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  secondaryButton: {
+    backgroundColor: "#10b981",
+    color: "white",
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontSize: "0.9rem",
+    width: "100%",
+  },
+  grid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gap: "20px",
+  },
+  card: {
+    backgroundColor: "white",
+    border: "1px solid #d1d5db",
+    borderRadius: "8px",
+    padding: "15px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "10px",
+  },
+  cardActions: { marginTop: "15px" },
+  badge: {
+    backgroundColor: "#dbeafe",
+    color: "#1e40af",
+    padding: "4px 8px",
+    borderRadius: "4px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+  },
+  activeBadge: {
+    backgroundColor: "#d1fae5",
+    color: "#065f46",
+    padding: "4px 8px",
+    borderRadius: "4px",
+    fontSize: "0.8rem",
+    fontWeight: "bold",
+  },
+  bidTable: {
+    backgroundColor: "white",
+    border: "1px solid #e5e7eb",
+    borderRadius: "8px",
+    overflow: "hidden",
+  },
+  bidRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "15px",
+    borderBottom: "1px solid #f3f4f6",
+  },
+  bidDetails: {
+    textAlign: "right",
+  },
+  smallText: { fontSize: "0.85rem", color: "#9ca3af" },
+  wonBadge: { fontSize: "0.85rem", color: "#16a34a", fontWeight: "bold" },
+  emptyState: { color: "#9ca3af", textAlign: "center", padding: "20px" },
+};
