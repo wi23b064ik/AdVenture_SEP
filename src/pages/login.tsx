@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // Standard Navigation für Vite/React
 
 export default function Login() {
-  const navigate = useNavigate(); // Hook für die Weiterleitung
 
   // State für die Eingabefelder
-  const [identifier, setIdentifier] = useState(''); // Benutzername oder E-Mail
+  const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
   
   // State für Feedback
@@ -18,7 +16,6 @@ export default function Login() {
     setError('');
 
     try {
-      // WICHTIG: Hier muss die volle URL zu Ihrem Backend stehen (Port 3001)
       const response = await fetch('http://localhost:3001/api/login', {
         method: 'POST',
         headers: {
@@ -35,26 +32,25 @@ export default function Login() {
       if (response.ok) {
         console.log('Login erfolgreich:', data);
         
-        // === WEITERLEITUNG BASIEREND AUF ROLLE ===
-        // Passen Sie die Pfade an die Namen Ihrer anderen .tsx Dateien an
-        // (z.B. wenn AdvertiserPage.tsx unter der Route '/advertiser' erreichbar ist)
+        // 1. Benutzer speichern
+        localStorage.setItem('user', JSON.stringify(data));
         
+        // 2. Weiterleiten (mit Reload)
         switch (data.role) {
           case 'Publisher':
-            navigate('/publisher'); // Leitet zur PublisherPage weiter
+            window.location.href = '/publisher';
             break;
           case 'Advertiser':
-            navigate('/advertiser'); // Leitet zur AdvertiserPage weiter
+            window.location.href = '/advertiser';
             break;
           case 'Admin':
-            navigate('/admin');
+            window.location.href = '/admin';
             break;
           default:
-            navigate('/'); // Fallback zur Homepage
+            window.location.href = '/'; 
         }
 
       } else {
-        // Fehler vom Server anzeigen
         setError(data.message || 'Login fehlgeschlagen');
       }
 
@@ -72,12 +68,10 @@ export default function Login() {
         <h2 style={styles.title}>Willkommen zurück</h2>
         <p style={styles.subtitle}>Bitte melden Sie sich an</p>
 
-        {/* Fehlermeldung Box */}
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleLogin} style={styles.form}>
           
-          {/* Benutzername / Email */}
           <div style={styles.inputGroup}>
             <label style={styles.label} htmlFor="identifier">Benutzername oder E-Mail</label>
             <input
@@ -91,7 +85,6 @@ export default function Login() {
             />
           </div>
 
-          {/* Passwort */}
           <div style={styles.inputGroup}>
             <label style={styles.label} htmlFor="password">Passwort</label>
             <input
@@ -114,7 +107,7 @@ export default function Login() {
   );
 }
 
-// === STYLING (CSS-in-JS) ===
+// === STYLING ===
 const styles: { [key: string]: React.CSSProperties } = {
   container: {
     display: 'flex',

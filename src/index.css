@@ -176,3 +176,18 @@ input:focus {
 .navbar-links .active::after {
   width: 100%;
 }
+
+.navbar-logo {
+  margin-right: 30px; /* Schafft Platz nach rechts */
+  font-weight: bold;
+  font-size: 1.5rem;
+  color: #61dafb; /* Optional: Eine schöne Farbe für das Logo */
+}
+
+.navbar {
+  display: flex;
+  align-items: center; /* Sorgt dafür, dass Logo und Text vertikal mittig sind */
+  padding: 10px 20px;
+  background-color: #1f2937; /* Deine dunkle Farbe */
+  color: white;
+}
