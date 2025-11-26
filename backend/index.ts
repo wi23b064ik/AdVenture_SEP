@@ -242,6 +242,36 @@ app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
   }
 });
 
+// F) Neuen Ad Space erstellen (AKTUALISIERT)
+app.post('/api/ad-spaces', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    // Hier lesen wir jetzt AUCH category, minimumBidFloor und description
+    const { publisherId, name, width, height, category, minimumBidFloor, description } = req.body;
+    
+    connection = await mysql.createConnection(dbConfig);
+
+    const query = `
+      INSERT INTO ad_spaces (publisher_id, name, width, height,created_at, category, min_bid, description) 
+      VALUES (?, ?, ?, ?,NOW(), ?, ?, ?)
+    `;
+
+    await connection.execute(query, [
+      publisherId, name, width, height, 
+      category || 'General',        // Fallback falls leer
+      minimumBidFloor || 0,         // Fallback falls leer
+      description || ''             // Fallback falls leer
+    ]);
+
+    res.status(201).json({ message: 'Werbefläche erstellt' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Erstellen der Werbefläche' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
 // === Server starten ===
 app.listen(port, () => {
   console.log(`🚀 Backend-Server läuft auf http://localhost:${port}`);

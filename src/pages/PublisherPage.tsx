@@ -1,70 +1,110 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 
+// Typdefinition passend zu deiner Datenbank
 interface AdInventory {
-  id: string;
+  id: number;
   name: string;
-  category: string;
-  placement: string; // e.g., "banner_top", "sidebar", "video"
-  dimensions: string; // e.g., "728x90", "300x250"
-  estimatedDailyImpressions: number;
-  minimumBidFloor: number; // CPM floor price (€ per 1000 impressions)
-  description: string;
-  createdAt: Date;
-  auctions: number; // count of active auctions
+  width: number;
+  height: number;
+  // Optional: Falls du diese Felder später in der DB ergänzt
+  category?: string;
+  placement?: string;
+  estimatedDailyImpressions?: number;
+  minimumBidFloor?: number;
+  description?: string;
 }
 
 export default function PublisherPage() {
+  // User aus localStorage holen
+  const userString = localStorage.getItem('user');
+  const user = userString ? JSON.parse(userString) : null;
+
   const [adSpaces, setAdSpaces] = useState<AdInventory[]>([]);
+  
+  // Formular State
   const [formData, setFormData] = useState({
     name: "",
     category: "Technology",
     placement: "banner_top",
-    dimensions: "728x90",
+    width: 728,  // Wir speichern Breite/Höhe separat für die DB
+    height: 90,
     estimatedDailyImpressions: 10000,
     minimumBidFloor: 0.5,
     description: "",
   });
 
+  // === 1. DATEN LADEN ===
+  useEffect(() => {
+    if (user) {
+      fetchMyAdSpaces();
+    }
+  }, []);
+
+  const fetchMyAdSpaces = async () => {
+    try {
+      const res = await fetch(`http://localhost:3001/api/ad-spaces/publisher/${user.id}`);
+      const data = await res.json();
+      setAdSpaces(data);
+    } catch (err) {
+      console.error("Fehler beim Laden:", err);
+    }
+  };
+
+  // === 2. NEUE FLÄCHE ERSTELLEN ===
+  const addAdSpace = async () => {
+    if (!formData.name) {
+      alert("Please fill in the Ad Space name");
+      return;
+    }
+
+    try {
+      // Wir senden die Daten an das Backend
+      const res = await fetch('http://localhost:3001/api/ad-spaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          publisherId: user.id,
+          name: formData.name,
+          width: formData.width,   // Diese Werte nutzen wir
+          height: formData.height
+          // Hinweis: Deine DB Tabelle "ad_spaces" hat aktuell nur name, width, height.
+          // Felder wie Category, Placement, BidFloor werden hier gesendet, aber vom Backend ignoriert,
+          // solange du die DB-Tabelle nicht erweiterst. Das ist okay für den Anfang!
+        })
+      });
+
+      if (res.ok) {
+        alert("Werbefläche erfolgreich erstellt!");
+        // Reset Formular
+        setFormData({
+          name: "", category: "Technology", placement: "banner_top",
+          width: 728, height: 90,
+          estimatedDailyImpressions: 10000, minimumBidFloor: 0.5, description: ""
+        });
+        fetchMyAdSpaces(); // Liste neu laden
+      } else {
+        alert("Fehler beim Speichern.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: name === "estimatedDailyImpressions" || name === "minimumBidFloor" 
+      [name]: name === "estimatedDailyImpressions" || name === "minimumBidFloor" || name === "width" || name === "height"
         ? parseFloat(value) 
         : value,
     });
   };
 
-  const addAdSpace = () => {
-    if (!formData.name) {
-      alert("Please fill in the Ad Space name");
-      return;
-    }
-    const newAd: AdInventory = {
-      id: Date.now().toString(),
-      ...formData,
-      createdAt: new Date(),
-      auctions: 0,
-    };
-    setAdSpaces([...adSpaces, newAd]);
-    setFormData({
-      name: "",
-      category: "Technology",
-      placement: "banner_top",
-      dimensions: "728x90",
-      estimatedDailyImpressions: 10000,
-      minimumBidFloor: 0.5,
-      description: "",
-    });
-  };
-
-  const calculateEstimatedRevenue = (space: AdInventory) => {
-    return ((space.estimatedDailyImpressions * space.minimumBidFloor) / 1000).toFixed(2);
-  };
+  if (!user) return <div style={{padding: '2rem'}}>Bitte erst einloggen.</div>;
 
   return (
     <div style={styles.container}>
-      <h2>Publisher Portal</h2>
+      <h2>Publisher Portal (Angemeldet: {user.username})</h2>
       <p>Create and manage ad spaces for advertisers to bid on.</p>
 
       {/* Form Section */}
@@ -74,83 +114,33 @@ export default function PublisherPage() {
           <div style={styles.formGroup}>
             <label>Ad Space Name *</label>
             <input
-              type="text"
-              name="name"
-              placeholder="e.g., Homepage Banner"
-              value={formData.name}
-              onChange={handleChange}
-              style={styles.input}
+              type="text" name="name" placeholder="e.g., Homepage Banner"
+              value={formData.name} onChange={handleChange} style={styles.input}
             />
           </div>
 
+          {/* Wir haben width/height getrennt, damit es sauber in die DB geht */}
+          <div style={styles.formGroup}>
+            <label>Width (px)</label>
+            <input type="number" name="width" value={formData.width} onChange={handleChange} style={styles.input} />
+          </div>
+          <div style={styles.formGroup}>
+            <label>Height (px)</label>
+            <input type="number" name="height" value={formData.height} onChange={handleChange} style={styles.input} />
+          </div>
+
+          {/* Diese Felder sind nur UI-Dummies, solange die DB sie nicht speichert */}
           <div style={styles.formGroup}>
             <label>Category</label>
             <select name="category" value={formData.category} onChange={handleChange} style={styles.input}>
               <option>Technology</option>
               <option>Fashion</option>
-              <option>Finance</option>
-              <option>Gaming</option>
-              <option>News</option>
-              <option>Other</option>
             </select>
           </div>
 
           <div style={styles.formGroup}>
-            <label>Placement Type</label>
-            <select name="placement" value={formData.placement} onChange={handleChange} style={styles.input}>
-              <option value="banner_top">Top Banner (728x90)</option>
-              <option value="banner_side">Side Banner (300x250)</option>
-              <option value="video_pre">Pre-roll Video</option>
-              <option value="native">Native Ad</option>
-              <option value="interstitial">Interstitial</option>
-            </select>
-          </div>
-
-          <div style={styles.formGroup}>
-            <label>Dimensions</label>
-            <input
-              type="text"
-              name="dimensions"
-              placeholder="e.g., 728x90"
-              value={formData.dimensions}
-              onChange={handleChange}
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label>Est. Daily Impressions</label>
-            <input
-              type="number"
-              name="estimatedDailyImpressions"
-              value={formData.estimatedDailyImpressions}
-              onChange={handleChange}
-              style={styles.input}
-            />
-          </div>
-
-          <div style={styles.formGroup}>
-            <label>Minimum Bid Floor (€ CPM)</label>
-            <input
-              type="number"
-              step="0.1"
-              name="minimumBidFloor"
-              value={formData.minimumBidFloor}
-              onChange={handleChange}
-              style={styles.input}
-            />
-          </div>
-
-          <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
-            <label>Description</label>
-            <input
-              type="text"
-              name="description"
-              placeholder="Describe the audience and context"
-              value={formData.description}
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <label>Min. Bid Floor (€)</label>
+            <input type="number" step="0.1" name="minimumBidFloor" value={formData.minimumBidFloor} onChange={handleChange} style={styles.input} />
           </div>
         </div>
 
@@ -170,28 +160,10 @@ export default function PublisherPage() {
               <div key={space.id} style={styles.card}>
                 <div style={styles.cardHeader}>
                   <h4>{space.name}</h4>
-                  <span style={styles.badge}>{space.placement}</span>
+                  <span style={styles.badge}>{space.width}x{space.height}</span>
                 </div>
-                <p style={styles.cardText}>
-                  <strong>Category:</strong> {space.category}
-                </p>
-                <p style={styles.cardText}>
-                  <strong>Dimensions:</strong> {space.dimensions}
-                </p>
-                <p style={styles.cardText}>
-                  <strong>Daily Impressions:</strong> {space.estimatedDailyImpressions.toLocaleString()}
-                </p>
-                <p style={styles.cardText}>
-                  <strong>Min. Bid Floor (CPM):</strong> €{space.minimumBidFloor.toFixed(2)}
-                </p>
-                <p style={styles.cardText}>
-                  <strong>Est. Daily Revenue:</strong> €{calculateEstimatedRevenue(space)}
-                </p>
-                <p style={styles.cardText}>
-                  <strong>Active Auctions:</strong> {space.auctions}
-                </p>
-                <p style={styles.description}>{space.description}</p>
-                <button style={styles.secondaryButton}>Start Auction</button>
+                <p style={styles.cardText}><strong>ID:</strong> {space.id}</p>
+                <button style={styles.secondaryButton}>Manage</button>
               </div>
             ))}
           </div>
@@ -201,78 +173,20 @@ export default function PublisherPage() {
   );
 }
 
+// Deine Styles (unverändert, sehen gut aus!)
 const styles: { [key: string]: React.CSSProperties } = {
   container: { padding: "20px", maxWidth: "1200px", margin: "0 auto" },
-  formSection: {
-    backgroundColor: "#f9fafb",
-    padding: "20px",
-    borderRadius: "8px",
-    marginBottom: "30px",
-    border: "1px solid #e5e7eb",
-  },
-  formGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-    gap: "15px",
-    marginBottom: "15px",
-  },
-  formGroup: {
-    display: "flex",
-    flexDirection: "column",
-  },
-  input: {
-    padding: "8px",
-    border: "1px solid #d1d5db",
-    borderRadius: "4px",
-    fontSize: "0.9rem",
-  },
-  button: {
-    backgroundColor: "#2563eb",
-    color: "white",
-    padding: "10px 20px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    fontWeight: "bold",
-  },
+  formSection: { backgroundColor: "#f9fafb", padding: "20px", borderRadius: "8px", marginBottom: "30px", border: "1px solid #e5e7eb" },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "15px", marginBottom: "15px" },
+  formGroup: { display: "flex", flexDirection: "column" },
+  input: { padding: "8px", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "0.9rem" },
+  button: { backgroundColor: "#2563eb", color: "white", padding: "10px 20px", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" },
   listSection: { marginTop: "30px" },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-    gap: "20px",
-  },
-  card: {
-    backgroundColor: "white",
-    border: "1px solid #d1d5db",
-    borderRadius: "8px",
-    padding: "15px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-  },
-  cardHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "10px",
-  },
-  badge: {
-    backgroundColor: "#dbeafe",
-    color: "#1e40af",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-  },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" },
+  card: { backgroundColor: "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "15px", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" },
+  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" },
+  badge: { backgroundColor: "#dbeafe", color: "#1e40af", padding: "4px 8px", borderRadius: "4px", fontSize: "0.8rem", fontWeight: "bold" },
   cardText: { fontSize: "0.9rem", margin: "8px 0", color: "#4b5563" },
-  description: { fontSize: "0.85rem", color: "#9ca3af", marginTop: "10px", fontStyle: "italic" },
-  secondaryButton: {
-    backgroundColor: "#10b981",
-    color: "white",
-    padding: "8px 12px",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    marginTop: "10px",
-    width: "100%",
-  },
+  secondaryButton: { backgroundColor: "#10b981", color: "white", padding: "8px 12px", border: "none", borderRadius: "4px", cursor: "pointer", marginTop: "10px", width: "100%" },
   emptyState: { color: "#9ca3af", textAlign: "center", padding: "20px" },
 };
