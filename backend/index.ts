@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import mysql, { RowDataPacket } from 'mysql2/promise';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
+import multer from 'multer'; 
+import path from 'path';
 
 const app = express();
 const port = 3001;
@@ -9,6 +11,7 @@ const port = 3001;
 // === Konfiguration ===
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 // Datenbank-Konfiguration
 const dbConfig = {
@@ -17,6 +20,19 @@ const dbConfig = {
   password: 'mypass',           
   database: 'myapp' // <--- WICHTIG: Namen anpassen!
 };
+
+// === MULTER KONFIGURATION (Für Datei-Uploads) ===
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Speicherort
+  },
+  filename: (req, file, cb) => {
+    // Wir hängen den Zeitstempel an, damit Dateinamen einzigartig sind
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname)); 
+  }
+});
+const upload = multer({ storage: storage });
 
 // ==========================================
 // 1. LOGIN ROUTE
@@ -242,31 +258,58 @@ app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
   }
 });
 
-// F) Neuen Ad Space erstellen (AKTUALISIERT)
-app.post('/api/ad-spaces', async (req: Request, res: Response) => {
+// F) Neuen Ad Space erstellen (JETZT MIT BILD!)
+// 'upload.single("media")' bedeutet: Wir erwarten eine Datei im Feld "media"
+app.post('/api/ad-spaces', upload.single('media'), async (req, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
-    // Hier lesen wir jetzt AUCH category, minimumBidFloor und description
+    // req.body enthält die Textfelder
     const { publisherId, name, width, height, category, minimumBidFloor, description } = req.body;
     
+    // req.file enthält die Datei-Infos (falls eine hochgeladen wurde)
+    const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
     connection = await mysql.createConnection(dbConfig);
 
     const query = `
-      INSERT INTO ad_spaces (publisher_id, name, width, height,created_at, category, min_bid, description) 
-      VALUES (?, ?, ?, ?,NOW(), ?, ?, ?)
+      INSERT INTO ad_spaces (publisher_id, name, width, height,created_at, category, min_bid, description, media_url) 
+      VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)
     `;
 
     await connection.execute(query, [
       publisherId, name, width, height, 
-      category || 'General',        // Fallback falls leer
-      minimumBidFloor || 0,         // Fallback falls leer
-      description || ''             // Fallback falls leer
+      category || 'General',        
+      minimumBidFloor || 0,         
+      description || '',
+      mediaUrl // <--- Hier speichern wir den Pfad
     ]);
 
     res.status(201).json({ message: 'Werbefläche erstellt' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Fehler beim Erstellen der Werbefläche' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// G) Ad Spaces laden (Bleibt fast gleich, holt aber jetzt auch media_url)
+app.get('/api/ad-spaces/publisher/:publisherId', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { publisherId } = req.params;
+    connection = await mysql.createConnection(dbConfig);
+
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      'SELECT * FROM ad_spaces WHERE publisher_id = ? ORDER BY id DESC', 
+      [publisherId]
+    );
+    res.status(200).json(rows);
+  // ...
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error(error); // <--- DIESE ZEILE HINZUFÜGEN
+    res.status(500).json({ message: 'Fehler beim Laden der Werbeflächen' });
   } finally {
     if (connection) await connection.end();
   }
