@@ -315,6 +315,82 @@ app.get('/api/ad-spaces/publisher/:publisherId', async (req: Request, res: Respo
   }
 });
 
+// H) Einzelnen User laden (Damit die Daten im Profil-Formular stehen)
+app.get('/api/users/:id', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    connection = await mysql.createConnection(dbConfig);
+
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      'SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', 
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User nicht gefunden' });
+    }
+
+    res.status(200).json(rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Laden des Users' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// ==========================================
+// 6. USER UPDATE ROUTE (Profil bearbeiten)
+// ==========================================
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    const { firstname, lastname, email, password } = req.body;
+
+    connection = await mysql.createConnection(dbConfig);
+
+    // 1. Basis-Daten aktualisieren (Ohne Passwort)
+    const query = 'UPDATE users SET firstname = ?, lastname = ?, email = ? WHERE id = ?';
+    
+    // Wir sagen: Hier kommen Strings oder Zahlen rein
+    const params: (string | number)[] = [firstname, lastname, email, id];
+
+    await connection.execute(query, params);
+
+    // 2. Passwort nur aktualisieren, wenn eines eingegeben wurde
+    if (password && password.trim() !== "") {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      // Auch hier sicherheitshalber typisieren oder direkt einfügen
+      await connection.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
+    }
+
+    // 3. Die neuen Daten zurücksenden
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [id]);
+    const updatedUser = rows[0];
+
+    res.status(200).json({ 
+      message: 'Profil aktualisiert', 
+      user: {
+        id: updatedUser.id,
+        username: updatedUser.username,
+        role: updatedUser.role,
+        firstname: updatedUser.firstname,
+        lastname: updatedUser.lastname,
+        email: updatedUser.email,
+        salutation: updatedUser.salutation
+      }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Aktualisieren.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
 // === Server starten ===
 app.listen(port, () => {
   console.log(`🚀 Backend-Server läuft auf http://localhost:${port}`);
