@@ -35,6 +35,8 @@ export default function AdvertiserPage() {
   const [adSpaces, setAdSpaces] = useState<AdSpace[]>([]);
   const [bids, setBids] = useState<Bid[]>([]);
   const [showCampaignForm, setShowCampaignForm] = useState(false);
+  const [loadingBids, setLoadingBids] = useState(false);
+  const [bidError, setBidError] = useState<string | null>(null);
 
   // Formular States (Alle Felder!)
   const [campaignForm, setCampaignForm] = useState({
@@ -59,35 +61,66 @@ export default function AdvertiserPage() {
 
   // === 1. DATEN LADEN ===
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       fetchCampaigns();
       fetchAdSpaces();
       fetchBids();
     }
-  }, []);
+  }, [user?.id]);
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/campaigns/${user.id}`);
+      const res = await fetch(`http://localhost:3001/api/campaigns/${user.id}`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setCampaigns(data);
-    } catch (err) { console.error(err); }
+      console.log("Campaigns fetched:", data);
+      setCampaigns(Array.isArray(data) ? data : []);
+    } catch (err) { 
+      console.error("Error fetching campaigns:", err);
+    }
   };
 
   const fetchAdSpaces = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/ad-spaces`);
+      const res = await fetch(`http://localhost:3001/api/ad-spaces`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setAdSpaces(data);
-    } catch (err) { console.error(err); }
+      console.log("Ad spaces fetched:", data);
+      setAdSpaces(Array.isArray(data) ? data : []);
+    } catch (err) { 
+      console.error("Error fetching ad spaces:", err);
+    }
   };
 
   const fetchBids = async () => {
+    // Prevent multiple simultaneous requests
+    if (loadingBids) return;
+    
+    setLoadingBids(true);
+    setBidError(null);
     try {
-      const res = await fetch(`http://localhost:3001/api/bids/${user.id}`);
+      const res = await fetch(`http://localhost:3001/api/bids/${user.id}`, {
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
       const data = await res.json();
-      setBids(data);
-    } catch (err) { console.error(err); }
+      console.log("Bids fetched:", data);
+      setBids(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Error fetching bids:", err);
+      setBidError(err instanceof Error ? err.message : "Failed to load bids");
+      // Don't re-throw - just set error state
+    } finally {
+      setLoadingBids(false);
+    }
   };
 
   // === HANDLER ===
@@ -160,14 +193,26 @@ export default function AdvertiserPage() {
 
       if (response.ok) {
         alert("Gebot platziert!");
-        fetchBids(); // Liste aktualisieren
+        // Wait a bit before refreshing to let backend process
+        setTimeout(() => {
+          if (!loadingBids) {
+            fetchBids();
+          }
+        }, 500);
+      } else {
+        alert("Fehler beim Platzieren des Gebots");
       }
     } catch (err) {
       console.error(err);
+      alert("Error placing bid");
     }
   };
 
   if (!user) return <div style={{padding: '2rem'}}>Bitte einloggen</div>;
+
+  console.log("AdvertiserPage rendered with user:", user);
+  console.log("Campaigns:", campaigns);
+  console.log("Ad Spaces:", adSpaces);
 
   return (
     <div style={styles.container}>
@@ -276,56 +321,32 @@ export default function AdvertiserPage() {
 
       {/* --- BIDDING SECTION --- */}
       <div style={styles.section}>
-        <h3>Place Bids</h3>
-        <div style={styles.formSection}>
-          <div style={styles.formGrid}>
-            
-            {/* Kampagne auswählen (Daten aus DB) */}
-            <div style={styles.formGroup}>
-              <label>Select Campaign</label>
-              <select name="campaignId" value={bidForm.campaignId} onChange={handleBidChange} style={styles.input}>
-                <option value="">-- Choose --</option>
-                {campaigns.map(c => (
-                  <option key={c.id} value={c.id}>{c.campaign_name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Ad Space auswählen (Daten aus DB) */}
-            <div style={styles.formGroup}>
-              <label>Ad Space</label>
-              <select name="adSpaceId" value={bidForm.adSpaceId} onChange={handleBidChange} style={styles.input}>
-                <option value="">-- Choose Ad Space --</option>
-                {adSpaces.map(space => (
-                  <option key={space.id} value={space.id}>
-                    {space.name} ({space.width}x{space.height})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label>Bid Amount (€)</label>
-              <input type="number" name="bidAmountCPM" value={bidForm.bidAmountCPM} onChange={handleBidChange} style={styles.input} />
-            </div>
-          </div>
-          <button onClick={placeBid} style={styles.button}>Place Bid</button>
+        <h3>Active Auctions & Bidding</h3>
+        <div style={{...styles.formSection, backgroundColor: '#fff3cd', borderColor: '#ffc107'}}>
+          <p><strong>💡 Tip:</strong> Go to the <strong><a href="/bidding" style={{color: '#0066cc', textDecoration: 'underline'}}>Bidding Page</a></strong> to view active auctions and place bids!</p>
+          <p>The Bidding Page shows real-time auctions with live countdown timers and bid history.</p>
         </div>
 
-        <h4>Bid History</h4>
+        <h4>Your Bid History</h4>
+        {loadingBids && <p>Loading bids...</p>}
+        {bidError && <p style={{color: 'red'}}>Error: {bidError}</p>}
         <div style={styles.bidTable}>
-          {bids.map(bid => (
-             <div key={bid.id} style={styles.bidRow}>
-               <div>
-                 <strong>{bid.ad_space_name}</strong>
-                 <p style={styles.smallText}>Campaign: {bid.campaign_name}</p>
+          {bids && bids.length > 0 ? (
+            bids.map(bid => (
+               <div key={bid.id} style={styles.bidRow}>
+                 <div>
+                   <strong>{bid.ad_space_name}</strong>
+                   <p style={styles.smallText}>Campaign: {bid.campaign_name}</p>
+                 </div>
+                 <div style={styles.bidDetails}>
+                   <strong>€{Number(bid.bid_amount).toFixed(2)}</strong>
+                   <p style={styles.smallText}>{bid.status}</p>
+                 </div>
                </div>
-               <div style={styles.bidDetails}>
-                 <strong>€{Number(bid.bid_amount).toFixed(2)}</strong>
-                 <p style={styles.smallText}>{bid.status}</p>
-               </div>
-             </div>
-          ))}
+            ))
+          ) : (
+            <p style={{padding: '20px', color: '#666'}}>No bids yet. Go to the Bidding Page to place your first bid!</p>
+          )}
         </div>
       </div>
     </div>
