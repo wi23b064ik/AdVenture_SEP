@@ -214,18 +214,45 @@ app.get('/api/ad-spaces', async (req: Request, res: Response) => {
 app.post('/api/bids', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
-    const { campaignId, adSpaceId, bidAmount } = req.body;
+    const { campaignId, auctionId, bidAmount, advertiserId } = req.body;
+    
+    if (!auctionId || !campaignId || !bidAmount || !advertiserId) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
     connection = await mysql.createConnection(dbConfig);
 
-    await connection.execute(
-      'INSERT INTO bids (campaign_id, ad_space_id, bid_amount) VALUES (?, ?, ?)',
-      [campaignId, adSpaceId, bidAmount]
+    // Verify auction exists and is open
+    const [auctionResult] = await connection.execute<RowDataPacket[]>(
+      'SELECT id, status, minimum_bid_floor FROM auctions WHERE id = ?',
+      [auctionId]
     );
 
-    res.status(201).json({ message: 'Gebot platziert' });
+    if (!auctionResult || auctionResult.length === 0) {
+      return res.status(404).json({ message: 'Auction not found' });
+    }
+
+    const auction = auctionResult[0];
+    if (auction.status !== 'open') {
+      return res.status(400).json({ message: 'Auction is not open' });
+    }
+
+    if (bidAmount < auction.minimum_bid_floor) {
+      return res.status(400).json({ message: `Bid must be at least €${auction.minimum_bid_floor}` });
+    }
+
+    const result = await connection.execute(
+      'INSERT INTO bids (auction_id, campaign_id, advertiser_id, bid_amount, created_at, status) VALUES (?, ?, ?, ?, NOW(), "pending")',
+      [auctionId, campaignId, advertiserId, bidAmount]
+    );
+
+    res.status(201).json({ 
+      message: 'Bid placed successfully',
+      bidId: (result as any)[0].insertId 
+    });
   } catch (error) {
-    console.error("Fehler beim Bieten:", error); // Fehler nutzen!
-    res.status(500).json({ message: 'Fehler beim Bieten' });
+    console.error("Error placing bid:", error);
+    res.status(500).json({ message: 'Error placing bid' });
   } finally {
     if (connection) await connection.end();
   }
@@ -243,8 +270,9 @@ app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
              campaigns.campaign_name, ad_spaces.name as ad_space_name
       FROM bids
       JOIN campaigns ON bids.campaign_id = campaigns.id
-      JOIN ad_spaces ON bids.ad_space_id = ad_spaces.id
-      WHERE campaigns.advertiser_id = ?
+      JOIN auctions ON bids.auction_id = auctions.id
+      JOIN ad_spaces ON auctions.ad_space_id = ad_spaces.id
+      WHERE bids.advertiser_id = ?
       ORDER BY bids.created_at DESC
     `;
     
@@ -260,7 +288,7 @@ app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
 
 // F) Neuen Ad Space erstellen (JETZT MIT BILD!)
 // 'upload.single("media")' bedeutet: Wir erwarten eine Datei im Feld "media"
-app.post('/api/ad-spaces', upload.single('media'), async (req, res: Response) => {
+app.post('/api/ad-spaces', upload.single('media'), async (req, res) => {
   let connection: mysql.Connection | undefined;
   try {
     // req.body enthält die Textfelder
@@ -386,6 +414,316 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Fehler beim Aktualisieren.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// ==========================================
+// AUCTION ROUTES
+// ==========================================
+
+// GET all auctions with their bids
+app.get('/api/auctions', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    connection = await mysql.createConnection(dbConfig);
+
+    // Get all auctions with ad space info
+    const auctionQuery = `
+      SELECT 
+        a.id,
+        a.ad_space_id,
+        a.start_time,
+        a.end_time,
+        a.status,
+        a.minimum_bid_floor,
+        a.winning_bid_id,
+        ads.name as adSpaceName,
+        ads.width,
+        ads.height,
+        ads.category,
+        u.id as publisherId,
+        u.username as publisherName
+      FROM auctions a
+      JOIN ad_spaces ads ON a.ad_space_id = ads.id
+      JOIN users u ON ads.publisher_id = u.id
+      ORDER BY a.end_time DESC
+    `;
+
+    const [auctions] = await connection.execute<RowDataPacket[]>(auctionQuery);
+
+    // For each auction, fetch all bids
+    const auctionsWithBids = await Promise.all(
+      auctions.map(async (auction: any) => {
+        const bidsQuery = `
+          SELECT 
+            b.id,
+            b.campaign_id,
+            b.advertiser_id,
+            b.bid_amount,
+            b.created_at,
+            b.status,
+            c.campaign_name,
+            u.username as advertiserName
+          FROM bids b
+          JOIN campaigns c ON b.campaign_id = c.id
+          JOIN users u ON b.advertiser_id = u.id
+          WHERE b.auction_id = ?
+          ORDER BY b.bid_amount DESC
+        `;
+
+        const [bids] = await connection!.execute<RowDataPacket[]>(bidsQuery, [auction.id]);
+
+        // Determine if auction should be closed (end_time passed)
+        const now = new Date();
+        const endTime = new Date(auction.end_time);
+        let status = auction.status;
+
+        if (endTime < now && status === 'open') {
+          status = 'closed';
+          // Update in database
+          await connection!.execute('UPDATE auctions SET status = ? WHERE id = ?', ['closed', auction.id]);
+        }
+
+        return {
+          id: auction.id,
+          adSpaceName: auction.adSpaceName,
+          adSpaceId: auction.ad_space_id,
+          publisherId: auction.publisherId,
+          publisherName: auction.publisherName,
+          startTime: auction.start_time,
+          endTime: auction.end_time,
+          status: status,
+          minimumBidFloor: auction.minimum_bid_floor,
+          totalBids: bids.length,
+          allBids: bids.map((bid: any) => ({
+            id: bid.id,
+            auctionId: auction.id,
+            advertiserId: bid.advertiser_id,
+            advertiserName: bid.advertiserName,
+            campaignName: bid.campaign_name,
+            campaignId: bid.campaign_id,
+            bidAmountCPM: parseFloat(bid.bid_amount),
+            submitTime: bid.created_at,
+            status: bid.status
+          })),
+          winningBid: bids.length > 0 ? {
+            id: bids[0].id,
+            advertiserId: bids[0].advertiser_id,
+            advertiserName: bids[0].advertiserName,
+            campaignName: bids[0].campaign_name,
+            bidAmountCPM: parseFloat(bids[0].bid_amount)
+          } : null
+        };
+      })
+    );
+
+    res.status(200).json(auctionsWithBids);
+  } catch (error) {
+    console.error('Auction fetch error:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen der Auktionen.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// GET specific auction with all bids
+app.get('/api/auctions/:id', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    connection = await mysql.createConnection(dbConfig);
+
+    const auctionQuery = `
+      SELECT 
+        a.id,
+        a.ad_space_id,
+        a.start_time,
+        a.end_time,
+        a.status,
+        a.minimum_bid_floor,
+        ads.name as adSpaceName,
+        ads.width,
+        ads.height,
+        u.id as publisherId
+      FROM auctions a
+      JOIN ad_spaces ads ON a.ad_space_id = ads.id
+      JOIN users u ON ads.publisher_id = u.id
+      WHERE a.id = ?
+    `;
+
+    const [auctionRows] = await connection.execute<RowDataPacket[]>(auctionQuery, [id]);
+
+    if (auctionRows.length === 0) {
+      return res.status(404).json({ message: 'Auktion nicht gefunden.' });
+    }
+
+    const auction = auctionRows[0];
+
+    const bidsQuery = `
+      SELECT 
+        b.id,
+        b.campaign_id,
+        b.advertiser_id,
+        b.bid_amount,
+        b.created_at,
+        b.status,
+        c.campaign_name,
+        u.username as advertiserName
+      FROM bids b
+      JOIN campaigns c ON b.campaign_id = c.id
+      JOIN users u ON b.advertiser_id = u.id
+      WHERE b.auction_id = ?
+      ORDER BY b.bid_amount DESC
+    `;
+
+    const [bids] = await connection.execute<RowDataPacket[]>(bidsQuery, [id]);
+
+    res.status(200).json({
+      id: auction.id,
+      adSpaceName: auction.adSpaceName,
+      adSpaceId: auction.ad_space_id,
+      publisherId: auction.publisherId,
+      startTime: auction.start_time,
+      endTime: auction.end_time,
+      status: auction.status,
+      minimumBidFloor: auction.minimum_bid_floor,
+      totalBids: bids.length,
+      allBids: bids.map((bid: any) => ({
+        id: bid.id,
+        auctionId: id,
+        advertiserId: bid.advertiser_id,
+        advertiserName: bid.advertiserName,
+        campaignName: bid.campaign_name,
+        bidAmountCPM: parseFloat(bid.bid_amount),
+        submitTime: bid.created_at,
+        status: bid.status
+      }))
+    });
+  } catch (error) {
+    console.error('Auction detail error:', error);
+    res.status(500).json({ message: 'Fehler beim Abrufen der Auktion.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// CREATE new auction
+app.post('/api/auctions', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { ad_space_id, start_time, end_time, minimum_bid_floor } = req.body;
+
+    console.log('Auction creation request:', { ad_space_id, start_time, end_time, minimum_bid_floor });
+
+    if (!ad_space_id || !start_time || !end_time) {
+      return res.status(400).json({ message: 'Ad Space ID, Start Zeit und End Zeit erforderlich.' });
+    }
+
+    connection = await mysql.createConnection(dbConfig);
+
+    // Verify ad_space exists
+    const [spaceCheck] = await connection.execute<RowDataPacket[]>(
+      'SELECT id FROM ad_spaces WHERE id = ?',
+      [ad_space_id]
+    );
+
+    if (!spaceCheck || spaceCheck.length === 0) {
+      return res.status(404).json({ message: 'Ad space not found' });
+    }
+
+    // Convert ISO strings to MySQL format
+    const startDate = new Date(start_time);
+    const endDate = new Date(end_time);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format' });
+    }
+
+    const query = `
+      INSERT INTO auctions (ad_space_id, start_time, end_time, minimum_bid_floor, status, created_at)
+      VALUES (?, ?, ?, ?, 'open', NOW())
+    `;
+
+    const [result] = await connection.execute(query, [
+      ad_space_id,
+      startDate,
+      endDate,
+      minimum_bid_floor || 0
+    ]);
+
+    console.log('Auction created successfully:', (result as any).insertId);
+
+    res.status(201).json({ 
+      message: 'Auktion erfolgreich erstellt.',
+      auctionId: (result as any).insertId
+    });
+  } catch (error) {
+    console.error('Auction creation error:', error);
+    res.status(500).json({ message: 'Fehler beim Erstellen der Auktion: ' + (error instanceof Error ? error.message : String(error)) });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// PLACE BID on auction
+app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    const { campaign_id, advertiser_id, bid_amount } = req.body;
+
+    if (!campaign_id || !advertiser_id || !bid_amount) {
+      return res.status(400).json({ message: 'Campaign ID, Advertiser ID und Bid Amount erforderlich.' });
+    }
+
+    connection = await mysql.createConnection(dbConfig);
+
+    // Check if auction exists and is open
+    const auctionQuery = 'SELECT status, minimum_bid_floor, end_time FROM auctions WHERE id = ?';
+    const [auctionRows] = await connection.execute<RowDataPacket[]>(auctionQuery, [id]);
+
+    if (auctionRows.length === 0) {
+      return res.status(404).json({ message: 'Auktion nicht gefunden.' });
+    }
+
+    const auction = auctionRows[0];
+
+    // Check if auction is still open
+    if (auction.status === 'closed') {
+      return res.status(400).json({ message: 'Auktion ist bereits geschlossen.' });
+    }
+
+    const endTime = new Date(auction.end_time);
+    if (endTime < new Date()) {
+      // Auto-close auction
+      await connection.execute('UPDATE auctions SET status = ? WHERE id = ?', ['closed', id]);
+      return res.status(400).json({ message: 'Auktion ist abgelaufen.' });
+    }
+
+    // Check if bid meets minimum
+    if (bid_amount < auction.minimum_bid_floor) {
+      return res.status(400).json({ 
+        message: `Gebot muss mindestens ${auction.minimum_bid_floor} sein.` 
+      });
+    }
+
+    // Insert bid
+    const bidQuery = `
+      INSERT INTO bids (auction_id, campaign_id, advertiser_id, bid_amount, status, created_at)
+      VALUES (?, ?, ?, ?, 'accepted', NOW())
+    `;
+
+    const [result] = await connection.execute(bidQuery, [id, campaign_id, advertiser_id, bid_amount]);
+
+    res.status(201).json({ 
+      message: 'Gebot erfolgreich eingereicht.',
+      bidId: (result as any).insertId
+    });
+  } catch (error) {
+    console.error('Bid placement error:', error);
+    res.status(500).json({ message: 'Fehler beim Einreichen des Gebots.' });
   } finally {
     if (connection) await connection.end();
   }
