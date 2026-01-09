@@ -28,87 +28,191 @@ interface BidSubmission {
   status: "pending" | "accepted" | "rejected" | "won" | "lost";
 }
 
-export default function BiddingPage() {
-  const [auctions, setAuctions] = useState<Auction[]>([
-    {
-      id: "auction_1",
-      adSpaceName: "Homepage Banner",
-      adSpaceId: "space_1",
-      publisherId: "pub_1",
-      startTime: new Date(Date.now() - 10000),
-      endTime: new Date(Date.now() + 50000),
-      status: "open",
-      minimumBidFloor: 0.5,
-      totalBids: 3,
-      allBids: [
-        {
-          id: "bid_1",
-          auctionId: "auction_1",
-          advertiserId: "adv_1",
-          campaignName: "Spring Launch",
-          bidAmountCPM: 2.1,
-          submitTime: new Date(Date.now() - 8000),
-          status: "accepted",
-        },
-        {
-          id: "bid_2",
-          auctionId: "auction_1",
-          advertiserId: "adv_2",
-          campaignName: "Summer Sale",
-          bidAmountCPM: 2.5,
-          submitTime: new Date(Date.now() - 5000),
-          status: "accepted",
-        },
-        {
-          id: "bid_3",
-          auctionId: "auction_1",
-          advertiserId: "adv_3",
-          campaignName: "Mega Deal",
-          bidAmountCPM: 1.8,
-          submitTime: new Date(Date.now() - 2000),
-          status: "accepted",
-        },
-      ],
-    },
-    {
-      id: "auction_2",
-      adSpaceName: "Sidebar Ad (300x250)",
-      adSpaceId: "space_2",
-      publisherId: "pub_1",
-      startTime: new Date(Date.now() - 30000),
-      endTime: new Date(Date.now() - 5000),
-      status: "closed",
-      minimumBidFloor: 1.0,
-      totalBids: 2,
-      winningBid: {
-        advertiserId: "adv_1",
-        bidAmountCPM: 3.2,
-        campaignName: "Spring Launch",
-      },
-      allBids: [
-        {
-          id: "bid_4",
-          auctionId: "auction_2",
-          advertiserId: "adv_1",
-          campaignName: "Spring Launch",
-          bidAmountCPM: 3.2,
-          submitTime: new Date(Date.now() - 25000),
-          status: "won",
-        },
-        {
-          id: "bid_5",
-          auctionId: "auction_2",
-          advertiserId: "adv_2",
-          campaignName: "Summer Sale",
-          bidAmountCPM: 2.8,
-          submitTime: new Date(Date.now() - 20000),
-          status: "lost",
-        },
-      ],
-    },
-  ]);
+interface AdSpace {
+  id: number;
+  name: string;
+  width: number;
+  height: number;
+  min_bid: number;
+  category: string;
+}
 
+export default function BiddingPage() {
+  const [auctions, setAuctions] = useState<Auction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<{ [key: string]: string }>({});
+  const [bidFormData, setBidFormData] = useState<{ [key: string]: { campaignId: string; bidAmount: string } }>({});
+  const [placingBid, setPlacingBid] = useState<{ [key: string]: boolean }>({});
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [publisherAdSpaces, setPublisherAdSpaces] = useState<AdSpace[]>([]);
+  const [auctionFormData, setAuctionFormData] = useState({ adSpaceId: "", durationSeconds: "60" });
+  const [creatingAuction, setCreatingAuction] = useState(false);
+
+  // Get user role from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        setUserRole(user.role);
+      } catch (e) {
+        console.log("Could not parse user data");
+      }
+    }
+  }, []);
+
+  // Fetch publisher's ad spaces
+  const fetchPublisherAdSpaces = async (publisherId: string) => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/ad-spaces/publisher/${publisherId}`);
+      if (!response.ok) throw new Error("Failed to fetch ad spaces");
+      const data = await response.json();
+      setPublisherAdSpaces(data);
+    } catch (err) {
+      console.error("Error fetching ad spaces:", err);
+    }
+  };
+
+  // Fetch auctions from API
+  const fetchAuctions = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:3001/api/auctions");
+      if (!response.ok) throw new Error("Failed to fetch auctions");
+      
+      const data = await response.json();
+      
+      // Convert string dates to Date objects and convert snake_case to camelCase
+      const auctionsWithDates = data.map((auction: any) => ({
+        id: auction.id,
+        adSpaceId: auction.ad_space_id,
+        adSpaceName: auction.adSpaceName,
+        startTime: new Date(auction.start_time),
+        endTime: new Date(auction.end_time),
+        status: auction.status,
+        minimumBidFloor: parseFloat(auction.minimum_bid_floor) || 0,
+        totalBids: auction.totalBids || 0,
+        allBids: (auction.allBids || []).map((bid: any) => ({
+          id: bid.id,
+          campaignName: bid.campaign_name || bid.campaignName || 'Unknown',
+          bidAmountCPM: parseFloat(bid.bid_amount) || parseFloat(bid.bidAmountCPM) || 0,
+          submitTime: new Date(bid.created_at || bid.submitTime),
+          status: bid.status,
+        })),
+      }));
+      
+      setAuctions(auctionsWithDates);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+      console.error("Error fetching auctions:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create new auction
+  const handleStartAuction = async () => {
+    if (!auctionFormData.adSpaceId || !auctionFormData.durationSeconds) {
+      alert("Please select an ad space and set duration");
+      return;
+    }
+
+    try {
+      setCreatingAuction(true);
+      const userData = localStorage.getItem("user");
+      const user = userData ? JSON.parse(userData) : null;
+
+      const now = new Date();
+      const endTime = new Date(now.getTime() + parseInt(auctionFormData.durationSeconds) * 1000);
+
+      const response = await fetch("http://localhost:3001/api/auctions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ad_space_id: parseInt(auctionFormData.adSpaceId),
+          start_time: now.toISOString(),
+          end_time: endTime.toISOString(),
+          minimum_bid_floor: publisherAdSpaces.find(a => a.id === parseInt(auctionFormData.adSpaceId))?.min_bid || 0,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(`Error: ${result.message}`);
+      } else {
+        alert("Auction started successfully!");
+        setAuctionFormData({ adSpaceId: "", durationSeconds: "60" });
+        fetchAuctions(); // Refresh auctions list
+      }
+    } catch (err) {
+      alert("Failed to start auction: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setCreatingAuction(false);
+    }
+  };
+
+  // Fetch auctions on component mount
+  useEffect(() => {
+    fetchAuctions();
+    // Refresh auctions every 5 seconds to check for status changes
+    const refreshInterval = setInterval(fetchAuctions, 5000);
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Fetch publisher's ad spaces when user role is determined
+  useEffect(() => {
+    if (userRole === "Publisher") {
+      const userData = localStorage.getItem("user");
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          fetchPublisherAdSpaces(user.id);
+        } catch (e) {
+          console.log("Could not parse user data");
+        }
+      }
+    }
+  }, [userRole]);
+
+  // Handle bid submission
+  const handlePlaceBid = async (auctionId: string) => {
+    const bidData = bidFormData[auctionId];
+    if (!bidData || !bidData.campaignId || !bidData.bidAmount) {
+      alert("Please fill in all bid fields");
+      return;
+    }
+
+    try {
+      setPlacingBid({ ...placingBid, [auctionId]: true });
+      
+      const response = await fetch(`http://localhost:3001/api/auctions/${auctionId}/bids`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          campaign_id: parseInt(bidData.campaignId),
+          advertiser_id: 3, // Sarah from test data (ID 3)
+          bid_amount: parseFloat(bidData.bidAmount),
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        alert(`Error: ${result.message}`);
+      } else {
+        alert("Bid placed successfully!");
+        setBidFormData({ ...bidFormData, [auctionId]: { campaignId: "", bidAmount: "" } });
+        fetchAuctions(); // Refresh to see the new bid
+      }
+    } catch (err) {
+      alert("Failed to place bid: " + (err instanceof Error ? err.message : "Unknown error"));
+    } finally {
+      setPlacingBid({ ...placingBid, [auctionId]: false });
+    }
+  };
 
   // Update countdown timer
   useEffect(() => {
@@ -150,6 +254,84 @@ export default function BiddingPage() {
       <p>
         Advertisers compete in real-time auctions for ad spaces. Prices are based on CPM (Cost Per 1000 Impressions).
       </p>
+
+      {/* Start Auction Section (Publisher Only) */}
+      {userRole === "Publisher" && (
+        <div style={styles.publisherSection}>
+          <h3>🎯 Start New Auction</h3>
+          <div style={styles.auctionFormGroup}>
+            <div style={styles.formRow}>
+              <div style={styles.formField}>
+                <label style={styles.label}>Select Ad Space:</label>
+                <select
+                  value={auctionFormData.adSpaceId}
+                  onChange={(e) =>
+                    setAuctionFormData({ ...auctionFormData, adSpaceId: e.target.value })
+                  }
+                  style={styles.select}
+                >
+                  <option value="">-- Choose an ad space --</option>
+                  {publisherAdSpaces.map((space) => (
+                    <option key={space.id} value={space.id}>
+                      {space.name} ({space.width}x{space.height}) - Min: €{space.min_bid}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={styles.formField}>
+                <label style={styles.label}>Auction Duration:</label>
+                <select
+                  value={auctionFormData.durationSeconds}
+                  onChange={(e) =>
+                    setAuctionFormData({ ...auctionFormData, durationSeconds: e.target.value })
+                  }
+                  style={styles.select}
+                >
+                  <option value="60">1 Minute (60 sec)</option>
+                  <option value="120">2 Minutes (120 sec)</option>
+                  <option value="180">3 Minutes (180 sec)</option>
+                  <option value="300">5 Minutes (300 sec)</option>
+                  <option value="600">10 Minutes (600 sec)</option>
+                </select>
+              </div>
+
+              <button
+                onClick={handleStartAuction}
+                disabled={creatingAuction || !auctionFormData.adSpaceId}
+                style={{
+                  ...styles.startAuctionButton,
+                  opacity: creatingAuction || !auctionFormData.adSpaceId ? 0.6 : 1,
+                }}
+              >
+                {creatingAuction ? "Starting..." : "🚀 Start Auction"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div style={styles.errorBox}>
+          <p>⚠️ Error: {error}</p>
+          <button onClick={fetchAuctions} style={styles.retryButton}>Retry</button>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div style={styles.loadingBox}>
+          <p>Loading auctions...</p>
+        </div>
+      )}
+
+      {/* No Auctions */}
+      {!loading && auctions.length === 0 && !error && (
+        <div style={styles.emptyState}>
+          <p>No auctions available at the moment.</p>
+        </div>
+      )}
 
       {/* Open Auctions */}
       <div style={styles.section}>
@@ -204,6 +386,60 @@ export default function BiddingPage() {
                 </div>
 
                 <button style={styles.detailsButton}>View Details</button>
+
+                {/* Bid Placement Form */}
+                {auction.status === "open" && (
+                  <div style={styles.bidFormContainer}>
+                    <h5 style={styles.bidFormTitle}>Place Your Bid</h5>
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Campaign ID:</label>
+                      <input
+                        type="number"
+                        placeholder="Enter campaign ID (1, 2, or 3)"
+                        value={bidFormData[auction.id]?.campaignId || ""}
+                        onChange={(e) =>
+                          setBidFormData({
+                            ...bidFormData,
+                            [auction.id]: {
+                              ...(bidFormData[auction.id] || { bidAmount: "" }),
+                              campaignId: e.target.value,
+                            },
+                          })
+                        }
+                        style={styles.input}
+                      />
+                    </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.label}>Bid Amount (CPM €):</label>
+                      <input
+                        type="number"
+                        placeholder="Must be >= €0.50"
+                        step="0.01"
+                        value={bidFormData[auction.id]?.bidAmount || ""}
+                        onChange={(e) =>
+                          setBidFormData({
+                            ...bidFormData,
+                            [auction.id]: {
+                              ...(bidFormData[auction.id] || { campaignId: "" }),
+                              bidAmount: e.target.value,
+                            },
+                          })
+                        }
+                        style={styles.input}
+                      />
+                    </div>
+                    <button
+                      onClick={() => handlePlaceBid(auction.id)}
+                      disabled={placingBid[auction.id]}
+                      style={{
+                        ...styles.bidButton,
+                        opacity: placingBid[auction.id] ? 0.6 : 1,
+                      }}
+                    >
+                      {placingBid[auction.id] ? "Placing Bid..." : "Place Bid"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -429,4 +665,111 @@ const styles: { [key: string]: React.CSSProperties } = {
   smallText: { fontSize: "0.85rem", color: "#9ca3af", margin: "4px 0 0 0" },
   highestBid: { color: "#dc2626", fontWeight: "bold" },
   emptyState: { color: "#9ca3af", textAlign: "center", padding: "20px" },
+  errorBox: {
+    backgroundColor: "#fee2e2",
+    border: "1px solid #fca5a5",
+    color: "#991b1b",
+    padding: "15px",
+    borderRadius: "6px",
+    marginBottom: "20px",
+  },
+  retryButton: {
+    backgroundColor: "#dc2626",
+    color: "white",
+    padding: "6px 12px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    marginTop: "10px",
+  },
+  loadingBox: {
+    backgroundColor: "#f0f9ff",
+    padding: "20px",
+    borderRadius: "6px",
+    textAlign: "center",
+    color: "#3b82f6",
+  },
+  bidFormContainer: {
+    backgroundColor: "#eff6ff",
+    border: "1px solid #bfdbfe",
+    borderRadius: "6px",
+    padding: "12px",
+    marginTop: "12px",
+  },
+  bidFormTitle: {
+    margin: "0 0 10px 0",
+    fontSize: "0.95rem",
+    color: "#1e40af",
+  },
+  formGroup: {
+    marginBottom: "10px",
+  },
+  label: {
+    display: "block",
+    fontSize: "0.8rem",
+    color: "#1f2937",
+    marginBottom: "4px",
+    fontWeight: "bold",
+  },
+  input: {
+    width: "100%",
+    padding: "6px 8px",
+    border: "1px solid #bfdbfe",
+    borderRadius: "4px",
+    fontSize: "0.9rem",
+    boxSizing: "border-box" as const,
+  },
+  bidButton: {
+    backgroundColor: "#22c55e",
+    color: "white",
+    padding: "8px 12px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    width: "100%",
+    fontWeight: "bold",
+    fontSize: "0.9rem",
+  },
+  publisherSection: {
+    backgroundColor: "#fef3c7",
+    border: "2px solid #fbbf24",
+    borderRadius: "8px",
+    padding: "20px",
+    marginBottom: "30px",
+  },
+  auctionFormGroup: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: "15px",
+  },
+  formRow: {
+    display: "flex",
+    gap: "15px",
+    alignItems: "flex-end",
+    flexWrap: "wrap" as const,
+  },
+  formField: {
+    flex: 1,
+    minWidth: "200px",
+  },
+  select: {
+    width: "100%",
+    padding: "8px 12px",
+    border: "1px solid #fbbf24",
+    borderRadius: "4px",
+    fontSize: "0.9rem",
+    backgroundColor: "white",
+    boxSizing: "border-box" as const,
+  },
+  startAuctionButton: {
+    backgroundColor: "#f59e0b",
+    color: "white",
+    padding: "10px 20px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "1rem",
+    whiteSpace: "nowrap" as const,
+  },
 };
