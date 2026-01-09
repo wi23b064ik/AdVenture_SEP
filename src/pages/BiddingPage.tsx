@@ -22,6 +22,7 @@ interface BidSubmission {
   id: string;
   auctionId: string;
   advertiserId: string;
+  advertiserName?: string;
   campaignName: string;
   bidAmountCPM: number;
   submitTime: Date;
@@ -96,7 +97,11 @@ export default function BiddingPage() {
         totalBids: auction.totalBids || 0,
         allBids: (auction.allBids || []).map((bid: any) => ({
           id: bid.id,
+          auctionId: auction.id,
+          advertiserId: bid.advertiser_id || bid.advertiserId,
+          advertiserName: bid.advertiserName || bid.advertiser_name,
           campaignName: bid.campaign_name || bid.campaignName || 'Unknown',
+          campaignId: bid.campaign_id || bid.campaignId,
           bidAmountCPM: parseFloat(bid.bid_amount) || parseFloat(bid.bidAmountCPM) || 0,
           submitTime: new Date(bid.created_at || bid.submitTime),
           status: bid.status,
@@ -122,9 +127,6 @@ export default function BiddingPage() {
 
     try {
       setCreatingAuction(true);
-      const userData = localStorage.getItem("user");
-      const user = userData ? JSON.parse(userData) : null;
-
       const now = new Date();
       const endTime = new Date(now.getTime() + parseInt(auctionFormData.durationSeconds) * 1000);
 
@@ -189,12 +191,20 @@ export default function BiddingPage() {
     try {
       setPlacingBid({ ...placingBid, [auctionId]: true });
       
+      const userData = localStorage.getItem('user');
+      const user = userData ? JSON.parse(userData) : null;
+      
+      if (!user || !user.id) {
+        alert("You must be logged in to place a bid");
+        return;
+      }
+
       const response = await fetch(`http://localhost:3001/api/auctions/${auctionId}/bids`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           campaign_id: parseInt(bidData.campaignId),
-          advertiser_id: 3, // Sarah from test data (ID 3)
+          advertiser_id: user.id, // Use logged-in user's ID
           bid_amount: parseFloat(bidData.bidAmount),
         }),
       });
@@ -388,8 +398,8 @@ export default function BiddingPage() {
 
                 <button style={styles.detailsButton}>View Details</button>
 
-                {/* Bid Placement Form */}
-                {auction.status === "open" && (
+                {/* Bid Placement Form - ONLY FOR ADVERTISERS */}
+                {auction.status === "open" && userRole === "Advertiser" && (
                   <div style={styles.bidFormContainer}>
                     <h5 style={styles.bidFormTitle}>Place Your Bid</h5>
                     <div style={styles.formGroup}>
@@ -441,6 +451,21 @@ export default function BiddingPage() {
                     </button>
                   </div>
                 )}
+
+                {/* Message for Publishers */}
+                {auction.status === "open" && userRole === "Publisher" && (
+                  <div style={{
+                    backgroundColor: "#fef3c7",
+                    border: "1px solid #fbbf24",
+                    padding: "12px",
+                    borderRadius: "6px",
+                    marginTop: "12px",
+                    color: "#92400e",
+                    fontSize: "0.9rem"
+                  }}>
+                    📊 Advertisers are bidding on this auction. Final winner will be determined when the timer ends.
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -456,19 +481,39 @@ export default function BiddingPage() {
           <div>
             {closedAuctions.map((auction) => {
               const winner = getWinningBid(auction);
+              const currentUser = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
+              const isCurrentUserWinner = winner && currentUser && winner.advertiserId === currentUser.id;
+              
               return (
                 <div key={auction.id} style={styles.completedAuctionCard}>
-                  <div style={styles.completedHeader}>
+                  <div style={{
+                    ...styles.completedHeader,
+                    backgroundColor: isCurrentUserWinner ? '#f0fdf4' : '#f9fafb',
+                    borderLeft: isCurrentUserWinner ? '4px solid #16a34a' : '1px solid #e5e7eb'
+                  }}>
                     <div>
                       <h4>{auction.adSpaceName}</h4>
                       <p style={styles.smallText}>{auction.adSpaceId}</p>
                     </div>
-                    <div style={styles.winnerBadge}>
+                    <div style={{
+                      ...styles.winnerBadge,
+                      background: isCurrentUserWinner 
+                        ? 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)'
+                        : 'linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)'
+                    }}>
                       {winner ? (
                         <>
-                          <p style={styles.winnerLabel}>Winner</p>
+                          <p style={styles.winnerLabel}>
+                            {isCurrentUserWinner ? '🎉 YOU WON!' : '🏆 Winner'}
+                          </p>
                           <p style={styles.winningPrice}>
                             €{winner.bidAmountCPM.toFixed(2)} CPM
+                          </p>
+                          <p style={{...styles.smallText, color: 'rgba(255, 255, 255, 0.95)', margin: '10px 0 0 0', fontWeight: '600', fontSize: '0.95rem'}}>
+                            {winner.campaignName}
+                          </p>
+                          <p style={{...styles.smallText, color: 'rgba(255, 255, 255, 0.8)', margin: '4px 0 0 0', fontSize: '0.85rem'}}>
+                            {winner.advertiserName && `by ${winner.advertiserName}`}
                           </p>
                         </>
                       ) : (
@@ -631,19 +676,31 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: "15px",
+    padding: "15px",
+    backgroundColor: "#f9fafb",
+    borderRadius: "8px",
+    border: "1px solid #e5e7eb",
   },
   winnerBadge: {
-    backgroundColor: "#d1fae5",
-    padding: "10px 15px",
-    borderRadius: "4px",
+    padding: "20px 24px",
+    borderRadius: "12px",
     textAlign: "right",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+    minWidth: "220px",
   },
-  winnerLabel: { fontSize: "0.75rem", color: "#065f46", margin: "0" },
+  winnerLabel: { 
+    fontSize: "0.75rem", 
+    color: "white", 
+    margin: "0",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: "1px",
+  },
   winningPrice: {
-    fontSize: "1.5rem",
-    fontWeight: "bold",
-    color: "#059669",
-    margin: "5px 0 0 0",
+    fontSize: "2rem",
+    fontWeight: "800",
+    color: "white",
+    margin: "10px 0 8px 0",
   },
   bidComparison: { marginTop: "15px" },
   bidsList: { display: "flex", flexDirection: "column", gap: "8px" },
