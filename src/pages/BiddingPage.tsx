@@ -48,6 +48,7 @@ export default function BiddingPage() {
   const [publisherAdSpaces, setPublisherAdSpaces] = useState<AdSpace[]>([]);
   const [auctionFormData, setAuctionFormData] = useState({ adSpaceId: "", durationSeconds: "60" });
   const [creatingAuction, setCreatingAuction] = useState(false);
+  const [expandedBidResults, setExpandedBidResults] = useState<{ [key: string]: boolean }>({});
 
   // Get user role from localStorage
   useEffect(() => {
@@ -479,36 +480,47 @@ export default function BiddingPage() {
                   <div style={styles.bidComparison}>
                     {auction.allBids.length > 0 && (
                       <>
-                        <h5>Bid Results</h5>
-                        <div style={styles.bidsList}>
-                          {auction.allBids
-                            .sort((a, b) => b.bidAmountCPM - a.bidAmountCPM)
-                            .map((bid, idx) => (
-                              <div
-                                key={bid.id}
-                                style={{
-                                  ...styles.bidResultRow,
-                                  backgroundColor:
-                                    bid.status === "won" ? "#d1fae5" : "#f3f4f6",
-                                }}
-                              >
-                                <span>
-                                  #{idx + 1} {bid.campaignName}
-                                </span>
-                                <span style={styles.bidResultPrice}>
-                                  €{bid.bidAmountCPM.toFixed(2)}
-                                </span>
-                                <span
+                        <button
+                          onClick={() => setExpandedBidResults({...expandedBidResults, [auction.id]: !expandedBidResults[auction.id]})}
+                          style={{
+                            ...styles.bidResultsToggle,
+                            backgroundColor: expandedBidResults[auction.id] ? "#3b82f6" : "#6b7280",
+                          }}
+                        >
+                          <span>{expandedBidResults[auction.id] ? "▼" : "▶"}</span> Bid Results ({auction.allBids.length})
+                        </button>
+                        
+                        {expandedBidResults[auction.id] && (
+                          <div style={styles.bidsList}>
+                            {auction.allBids
+                              .sort((a, b) => b.bidAmountCPM - a.bidAmountCPM)
+                              .map((bid, idx) => (
+                                <div
+                                  key={bid.id}
                                   style={{
-                                    color: bid.status === "won" ? "#16a34a" : "#9ca3af",
-                                    fontWeight: bid.status === "won" ? "bold" : "normal",
+                                    ...styles.bidResultRow,
+                                    backgroundColor:
+                                      bid.status === "won" ? "#d1fae5" : "#f3f4f6",
                                   }}
                                 >
-                                  {bid.status === "won" ? "🏆 Won" : "Lost"}
-                                </span>
-                              </div>
-                            ))}
-                        </div>
+                                  <span>
+                                    #{idx + 1} {bid.campaignName}
+                                  </span>
+                                  <span style={styles.bidResultPrice}>
+                                    €{bid.bidAmountCPM.toFixed(2)}
+                                  </span>
+                                  <span
+                                    style={{
+                                      color: bid.status === "won" ? "#16a34a" : "#9ca3af",
+                                      fontWeight: bid.status === "won" ? "bold" : "normal",
+                                    }}
+                                  >
+                                    {bid.status === "won" ? "🏆 Won" : "Lost"}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -771,5 +783,18 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontWeight: "bold",
     fontSize: "1rem",
     whiteSpace: "nowrap" as const,
+  },
+  bidResultsToggle: {
+    color: "white",
+    padding: "10px 15px",
+    border: "none",
+    borderRadius: "4px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "0.95rem",
+    width: "100%",
+    textAlign: "left" as const,
+    marginBottom: "10px",
+    transition: "background-color 0.3s",
   },
 };
