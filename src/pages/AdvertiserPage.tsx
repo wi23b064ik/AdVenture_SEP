@@ -53,12 +53,6 @@ export default function AdvertiserPage() {
     landingUrl: "",
   });
 
-  const [bidForm, setBidForm] = useState({
-    campaignId: "",
-    adSpaceId: "",
-    bidAmountCPM: 2.5,
-  });
-
   // === 1. DATEN LADEN ===
   useEffect(() => {
     if (user && user.id) {
@@ -136,14 +130,6 @@ export default function AdvertiserPage() {
     });
   };
 
-  const handleBidChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setBidForm({
-      ...bidForm,
-      [name]: name === "bidAmountCPM" ? parseFloat(value) : value,
-    });
-  };
-
   // === CREATE CAMPAIGN (POST) ===
   const createCampaign = async () => {
     if (!campaignForm.name) {
@@ -170,41 +156,6 @@ export default function AdvertiserPage() {
       }
     } catch (err) {
       console.error(err);
-    }
-  };
-
-  // === PLACE BID (POST) ===
-  const placeBid = async () => {
-    if (!bidForm.campaignId || !bidForm.adSpaceId) {
-      alert("Please select campaign and ad space");
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:3001/api/bids', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          campaignId: bidForm.campaignId,
-          adSpaceId: bidForm.adSpaceId,
-          bidAmount: bidForm.bidAmountCPM
-        })
-      });
-
-      if (response.ok) {
-        alert("Gebot platziert!");
-        // Wait a bit before refreshing to let backend process
-        setTimeout(() => {
-          if (!loadingBids) {
-            fetchBids();
-          }
-        }, 500);
-      } else {
-        alert("Fehler beim Platzieren des Gebots");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error placing bid");
     }
   };
 
