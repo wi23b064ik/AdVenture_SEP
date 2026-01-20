@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-// Typendefinition
-interface UserData {
+// Typen für unsere Benutzer
+interface User {
   id: number;
   username: string;
   email: string;
@@ -12,236 +12,234 @@ interface UserData {
 }
 
 export default function ProfilePage() {
-  const userString = localStorage.getItem('user');
-  const currentUser = userString ? JSON.parse(userString) : null;
-  const isAdmin = currentUser?.role === 'Admin';
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Admin State
-  const [allUsers, setAllUsers] = useState<UserData[]>([]); 
+  // State für das Bearbeiten
+  const [editingUser, setEditingUser] = useState<User | null>(null); // Welcher User wird gerade bearbeitet?
+  const [showModal, setShowModal] = useState(false); // Ist das Fenster offen?
 
-  // User State (Formular)
+  // Hilfs-State für das Formular
   const [formData, setFormData] = useState({
-    firstname: '',
-    lastname: '',
-    email: '',
-    password: ''
+    username: "",
+    email: "",
+    role: "Publisher",
+    firstname: "",
+    lastname: "",
+    salutation: "Herr"
   });
 
-  // === DATEN LADEN ===
-  useEffect(() => {
-    if (isAdmin) {
-      fetch('http://localhost:3001/api/users')
-        .then(res => res.json())
-        .then(data => setAllUsers(data))
-        .catch(err => console.error("Fehler:", err));
-    } else if (currentUser) {
-      fetch(`http://localhost:3001/api/users/${currentUser.id}`)
-        .then(res => res.json())
-        .then(data => {
-          setFormData({
-            firstname: data.firstname || '',
-            lastname: data.lastname || '',
-            email: data.email || '',
-            password: '' 
-          });
-        })
-        .catch(err => console.error("Fehler beim Laden meiner Daten:", err));
+  // 1. Benutzer laden beim Start
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("http://localhost:3001/api/users");
+      if (!response.ok) throw new Error("Fehler beim Laden der Benutzer");
+      const data = await response.json();
+      setUsers(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
-  }, [isAdmin, currentUser.id]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleUpdateProfile = async () => {
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // 2. Bearbeiten-Button geklickt
+  const handleEditClick = (user: User) => {
+    setEditingUser(user);
+    // Formular mit den aktuellen Daten füllen
+    setFormData({
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      firstname: user.firstname,
+      lastname: user.lastname,
+      salutation: user.salutation
+    });
+    setShowModal(true);
+  };
+
+  // 3. Speichern (an das Backend senden)
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
     try {
-      const res = await fetch(`http://localhost:3001/api/users/${currentUser.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstname: formData.firstname,
-          lastname: formData.lastname,
-          email: formData.email,
-          password: formData.password
-        })
+      const response = await fetch(`http://localhost:3001/api/users/${editingUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        // Wir senden alle Daten aus formData, aber KEIN Passwort
+        body: JSON.stringify(formData),
       });
 
-      const data = await res.json();
-
-      if (res.ok) {
-        alert("Profil erfolgreich aktualisiert!");
-        localStorage.setItem('user', JSON.stringify(data.user));
-        setFormData(prev => ({ ...prev, password: '' }));
-        window.location.reload();
+      if (response.ok) {
+        alert("Benutzer erfolgreich aktualisiert!");
+        setShowModal(false);
+        setEditingUser(null);
+        fetchUsers(); // Tabelle neu laden
       } else {
-        alert("Fehler: " + data.message);
+        alert("Fehler beim Speichern");
       }
     } catch (err) {
       console.error(err);
-      alert("Serverfehler beim Speichern.");
+      alert("Serverfehler beim Speichern");
     }
   };
 
-  if (!currentUser) return <div style={{ padding: '2rem' }}>Bitte einloggen.</div>;
+  if (loading) return <div style={{ padding: "20px" }}>Lade Profile...</div>;
+  if (error) return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
 
   return (
     <div style={styles.container}>
-      
-      {/* ADMIN ANSICHT */}
-      {isAdmin ? (
-        <div style={styles.card}>
-          <h1 style={styles.heading}>👥 Verwaltung aller Profile</h1>
-          <table style={styles.table}>
-            <thead>
-              <tr style={{ backgroundColor: '#f3f4f6', textAlign: 'left' }}>
-                <th style={styles.th}>ID</th>
-                <th style={styles.th}>Benutzername</th>
-                <th style={styles.th}>Rolle</th>
-                <th style={styles.th}>Name</th>
-                <th style={styles.th}>E-Mail</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allUsers.map((u) => (
-                <tr key={u.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={styles.td}>{u.id}</td>
-                  <td style={styles.td}><strong>{u.username}</strong></td>
-                  <td style={styles.td}>{u.role}</td>
-                  <td style={styles.td}>{u.firstname} {u.lastname}</td>
-                  <td style={styles.td}>{u.email}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        
-        /* USER ANSICHT (Jetzt volle Breite) */
-        <div style={styles.card}>
-          <h2 style={{marginBottom: '20px'}}>Mein Profil bearbeiten</h2>
-          
-          <div style={styles.headerInfo}>
-            <div style={styles.infoBadge}>👤 {currentUser.username}</div>
-            <div style={{...styles.infoBadge, backgroundColor: '#dbeafe', color: '#1e40af'}}>
-              {currentUser.role}
-            </div>
+      <div style={styles.headerRow}>
+        <h2>👥 Verwaltung aller Profile</h2>
+        <button onClick={fetchUsers} style={styles.refreshButton}>🔄 Aktualisieren</button>
+      </div>
+
+      <table style={styles.table}>
+        <thead>
+          <tr style={styles.trHead}>
+            <th style={styles.th}>ID</th>
+            <th style={styles.th}>Benutzername</th>
+            <th style={styles.th}>Rolle</th>
+            <th style={styles.th}>Name</th>
+            <th style={styles.th}>E-Mail</th>
+            <th style={styles.th}>Aktion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
+            <tr key={user.id} style={styles.tr}>
+              <td style={styles.td}>{user.id}</td>
+              <td style={styles.td}><strong>{user.username}</strong></td>
+              <td style={styles.td}>
+                <span style={user.role === 'Admin' ? styles.badgeAdmin : styles.badge}>
+                  {user.role}
+                </span>
+              </td>
+              <td style={styles.td}>{user.firstname} {user.lastname}</td>
+              <td style={styles.td}>{user.email}</td>
+              <td style={styles.td}>
+                <button 
+                  onClick={() => handleEditClick(user)} 
+                  style={styles.editButton}
+                >
+                  ✏️ Bearbeiten
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* --- MODAL (BEARBEITEN FENSTER) --- */}
+      {showModal && editingUser && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3>Benutzer bearbeiten: {editingUser.username}</h3>
+            
+            <form onSubmit={handleSave} style={styles.form}>
+              
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Rolle:</label>
+                <select 
+                  value={formData.role} 
+                  onChange={e => setFormData({...formData, role: e.target.value})}
+                  style={styles.select}
+                >
+                  <option value="Publisher">Publisher</option>
+                  <option value="Advertiser">Advertiser</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Benutzername:</label>
+                <input 
+                  type="text" 
+                  value={formData.username}
+                  onChange={e => setFormData({...formData, username: e.target.value})}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.row}>
+                <div style={{...styles.formGroup, flex: 1}}>
+                  <label style={styles.label}>Vorname:</label>
+                  <input 
+                    type="text" 
+                    value={formData.firstname}
+                    onChange={e => setFormData({...formData, firstname: e.target.value})}
+                    style={styles.input}
+                  />
+                </div>
+                <div style={{...styles.formGroup, flex: 1}}>
+                  <label style={styles.label}>Nachname:</label>
+                  <input 
+                    type="text" 
+                    value={formData.lastname}
+                    onChange={e => setFormData({...formData, lastname: e.target.value})}
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label}>E-Mail:</label>
+                <input 
+                  type="email" 
+                  value={formData.email}
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.buttonGroup}>
+                <button type="button" onClick={() => setShowModal(false)} style={styles.cancelButton}>Abbrechen</button>
+                <button type="submit" style={styles.saveButton}>Speichern</button>
+              </div>
+            </form>
           </div>
-
-          <div style={styles.formGrid}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Vorname</label>
-              <input 
-                style={styles.input} 
-                name="firstname" 
-                value={formData.firstname} 
-                onChange={handleChange} 
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Nachname</label>
-              <input 
-                style={styles.input} 
-                name="lastname" 
-                value={formData.lastname} 
-                onChange={handleChange} 
-              />
-            </div>
-
-            <div style={{ ...styles.formGroup, gridColumn: '1 / -1' }}>
-              <label style={styles.label}>E-Mail Adresse</label>
-              <input 
-                style={styles.input} 
-                name="email" 
-                value={formData.email} 
-                onChange={handleChange} 
-              />
-            </div>
-
-            <div style={{ ...styles.formGroup, gridColumn: '1 / -1' }}>
-              <label style={styles.label}>Neues Passwort setzen</label>
-              <input 
-                style={styles.input} 
-                type="password"
-                name="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                placeholder="Leer lassen, um altes zu behalten"
-              />
-            </div>
-          </div>
-
-          <button onClick={handleUpdateProfile} style={styles.button}>
-            Änderungen speichern
-          </button>
         </div>
       )}
     </div>
   );
 }
 
-// === STYLES (Korrigiert für Padding rechts) ===
+// === STYLES ===
 const styles: { [key: string]: React.CSSProperties } = {
-  container: { 
-    padding: '40px', // Etwas mehr Abstand zum Rand
-    fontFamily: 'Arial, sans-serif', 
-    backgroundColor: '#f9fafb', 
-    minHeight: '90vh',
-    boxSizing: 'border-box', // WICHTIG: Verhindert Überlauf nach rechts
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'center' // Zentriert den Inhalt
+  container: { maxWidth: "1000px", margin: "40px auto", padding: "20px", backgroundColor: "white", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.05)" },
+  headerRow: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" },
+  refreshButton: { padding: "8px 16px", backgroundColor: "#e5e7eb", border: "none", borderRadius: "4px", cursor: "pointer" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.95rem" },
+  trHead: { backgroundColor: "#f9fafb", textAlign: "left", borderBottom: "2px solid #e5e7eb" },
+  th: { padding: "12px 15px", color: "#374151", fontWeight: "600" },
+  tr: { borderBottom: "1px solid #f3f4f6" },
+  td: { padding: "12px 15px", color: "#4b5563" },
+  badge: { backgroundColor: "#dbeafe", color: "#1e40af", padding: "4px 8px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold" },
+  badgeAdmin: { backgroundColor: "#fee2e2", color: "#991b1b", padding: "4px 8px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold" },
+  editButton: { backgroundColor: "transparent", border: "1px solid #d1d5db", padding: "4px 8px", borderRadius: "4px", cursor: "pointer", fontSize: "0.85rem" },
+  
+  // Modal Styles
+  modalOverlay: {
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 1000
   },
-  
-  heading: { marginBottom: '1.5rem', color: '#111827' },
-  
-  // Card nimmt jetzt fast die ganze Breite, aber mit Max-Limit für Ästhetik
-  card: { 
-    backgroundColor: 'white', 
-    padding: '2rem', 
-    borderRadius: '10px', 
-    boxShadow: '0 4px 6px rgba(0,0,0,0.05)', 
-    width: '100%', 
-    maxWidth: '1400px', // Verhindert, dass es auf riesigen Monitoren unlesbar breit wird
-    boxSizing: 'border-box' // WICHTIG!
+  modalContent: {
+    backgroundColor: "white", padding: "30px", borderRadius: "8px", width: "100%", maxWidth: "500px", boxShadow: "0 4px 20px rgba(0,0,0,0.2)"
   },
-  
-  cardFullWidth: { 
-    backgroundColor: 'white', 
-    padding: '2rem', 
-    borderRadius: '10px', 
-    boxShadow: '0 2px 5px rgba(0,0,0,0.05)', 
-    width: '100%', 
-    boxSizing: 'border-box'
-  },
-  
-  headerInfo: { display: 'flex', gap: '15px', marginBottom: '30px' },
-  infoBadge: { padding: '5px 12px', borderRadius: '20px', backgroundColor: '#f3f4f6', fontSize: '0.9rem', fontWeight: '500', color: '#374151' },
-  
-  formGrid: { 
-    display: 'grid', 
-    gridTemplateColumns: '1fr 1fr', 
-    gap: '20px',
-    boxSizing: 'border-box'
-  },
-  
-  formGroup: { display: 'flex', flexDirection: 'column' },
-  label: { marginBottom: '5px', fontWeight: 'bold', fontSize: '0.85rem', color: '#4b5563' },
-  
-  input: { 
-    padding: '10px', 
-    borderRadius: '6px', 
-    border: '1px solid #d1d5db', 
-    fontSize: '1rem',
-    width: '100%', // Input füllt die Spalte
-    boxSizing: 'border-box' // WICHTIG: Damit Padding nicht die Breite sprengt
-  },
-  
-  button: { backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '12px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginTop: '20px' },
-  
-  table: { width: '100%', borderCollapse: 'collapse', marginTop: '1rem' },
-  th: { padding: '12px', borderBottom: '2px solid #ddd' },
-  td: { padding: '12px' },
-  // Ich habe cardFullWidth entfernt und benutze oben nur noch "card" für beides, da beides breit sein soll.
-  
+  form: { display: "flex", flexDirection: "column", gap: "15px" },
+  formGroup: { display: "flex", flexDirection: "column" },
+  row: { display: "flex", gap: "15px" },
+  label: { fontSize: "0.9rem", fontWeight: "bold", marginBottom: "5px", color: "#374151" },
+  input: { padding: "10px", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "1rem" },
+  select: { padding: "10px", border: "1px solid #d1d5db", borderRadius: "4px", fontSize: "1rem", backgroundColor: "white" },
+  buttonGroup: { display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" },
+  saveButton: { padding: "10px 20px", backgroundColor: "#2563eb", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" },
+  cancelButton: { padding: "10px 20px", backgroundColor: "#9ca3af", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }
 };

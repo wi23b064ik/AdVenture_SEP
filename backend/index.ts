@@ -13,7 +13,7 @@ const JWT_SECRET = 'super-geheimes-geheimnis'; // In Produktion unbedingt in .en
 
 // === Konfiguration ===
 app.use(cors({
-  origin: 'http://localhost:5173', // <--- WICHTIG: Hier auf 5173 geändert (Vite Port)!
+  origin: 'http://localhost:5173', // Vite Frontend Port
   credentials: true                
 }));
 app.use(express.json());
@@ -143,24 +143,84 @@ app.post('/api/register', async (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 3. ADMIN ROUTE
+// 3. ADMIN / USER ROUTEN
 // ==========================================
+
+// A) Alle User laden
 app.get('/api/users', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users');
+    const query = 'SELECT id, username, email, role, firstname, lastname, salutation FROM users';
+    const [rows] = await connection.execute<RowDataPacket[]>(query);
     return res.status(200).json(rows);
-  } catch (error) { 
+  } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Serverfehler.' });
+    return res.status(500).json({ message: 'Serverfehler beim Laden der Benutzer.' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// B) Einzelnen User laden
+app.get('/api/users/:id', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', [id]);
+    
+    if (rows.length === 0) return res.status(404).json({ message: 'User nicht gefunden' });
+    
+    res.status(200).json(rows[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Laden des Users' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// C) User bearbeiten (Update - ohne Passwort)
+app.put('/api/users/:id', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { id } = req.params;
+    const { firstname, lastname, email, username, role, salutation } = req.body;
+
+    connection = await mysql.createConnection(dbConfig);
+
+    const query = `
+      UPDATE users 
+      SET firstname = ?, lastname = ?, email = ?, username = ?, role = ?, salutation = ? 
+      WHERE id = ?
+    `;
+    
+    await connection.execute(query, [firstname, lastname, email, username, role, salutation, id]);
+
+    // Wenn ein Passwort mitgesendet wurde (optional), ändern wir es separat
+    if (req.body.password && req.body.password.trim() !== "") {
+      const hashedPassword = await bcrypt.hash(req.body.password, 10);
+      await connection.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
+    }
+
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', [id]);
+    
+    res.status(200).json({ 
+      message: 'Profil aktualisiert', 
+      user: rows[0] 
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Aktualisieren.' });
   } finally {
     if (connection) await connection.end();
   }
 });
 
 // ==========================================
-// 4. ADVERTISER ROUTEN
+// 4. ADVERTISER ROUTEN (Kampagnen & AdSpaces)
 // ==========================================
 app.post('/api/campaigns', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
@@ -213,7 +273,39 @@ app.get('/api/ad-spaces', async (req: Request, res: Response) => {
   }
 });
 
-// Gebot abgeben
+app.post('/api/ad-spaces', upload.single('media'), async (req, res) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { publisherId, name, width, height, category, minimumBidFloor, description } = req.body;
+    const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    connection = await mysql.createConnection(dbConfig);
+    const query = `INSERT INTO ad_spaces (publisher_id, name, width, height,created_at, category, min_bid, description, media_url) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)`;
+    await connection.execute(query, [publisherId, name, width, height, category || 'General', minimumBidFloor || 0, description || '', mediaUrl]);
+    res.status(201).json({ message: 'Werbefläche erstellt' });
+  } catch (error) { 
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Erstellen der Werbefläche' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+app.get('/api/ad-spaces/publisher/:publisherId', async (req: Request, res: Response) => {
+  let connection: mysql.Connection | undefined;
+  try {
+    const { publisherId } = req.params;
+    connection = await mysql.createConnection(dbConfig);
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ad_spaces WHERE publisher_id = ? ORDER BY id DESC', [publisherId]);
+    res.status(200).json(rows);
+  } catch (error) { 
+    console.error(error);
+    res.status(500).json({ message: 'Fehler beim Laden der Werbeflächen' });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+// D) Gebot abgeben (Allgemeine Route)
 app.post('/api/bids', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
@@ -255,81 +347,11 @@ app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
   }
 });
 
-app.post('/api/ad-spaces', upload.single('media'), async (req, res) => {
-  let connection: mysql.Connection | undefined;
-  try {
-    const { publisherId, name, width, height, category, minimumBidFloor, description } = req.body;
-    const mediaUrl = req.file ? `/uploads/${req.file.filename}` : null;
-    connection = await mysql.createConnection(dbConfig);
-    const query = `INSERT INTO ad_spaces (publisher_id, name, width, height,created_at, category, min_bid, description, media_url) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)`;
-    await connection.execute(query, [publisherId, name, width, height, category || 'General', minimumBidFloor || 0, description || '', mediaUrl]);
-    res.status(201).json({ message: 'Werbefläche erstellt' });
-  } catch (error) { 
-    console.error(error);
-    res.status(500).json({ message: 'Fehler beim Erstellen der Werbefläche' });
-  } finally {
-    if (connection) await connection.end();
-  }
-});
-
-app.get('/api/ad-spaces/publisher/:publisherId', async (req: Request, res: Response) => {
-  let connection: mysql.Connection | undefined;
-  try {
-    const { publisherId } = req.params;
-    connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM ad_spaces WHERE publisher_id = ? ORDER BY id DESC', [publisherId]);
-    res.status(200).json(rows);
-  } catch (error) { 
-    console.error(error);
-    res.status(500).json({ message: 'Fehler beim Laden der Werbeflächen' });
-  } finally {
-    if (connection) await connection.end();
-  }
-});
-
-app.get('/api/users/:id', async (req: Request, res: Response) => {
-  let connection: mysql.Connection | undefined;
-  try {
-    const { id } = req.params;
-    connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', [id]);
-    if (rows.length === 0) return res.status(404).json({ message: 'User nicht gefunden' });
-    res.status(200).json(rows[0]);
-  } catch (error) { 
-    console.error(error);
-    res.status(500).json({ message: 'Fehler beim Laden des Users' });
-  } finally {
-    if (connection) await connection.end();
-  }
-});
-
-app.put('/api/users/:id', async (req: Request, res: Response) => {
-  let connection: mysql.Connection | undefined;
-  try {
-    const { id } = req.params;
-    const { firstname, lastname, email, password } = req.body;
-    connection = await mysql.createConnection(dbConfig);
-    await connection.execute('UPDATE users SET firstname = ?, lastname = ?, email = ? WHERE id = ?', [firstname, lastname, email, id]);
-    if (password && password.trim() !== "") {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await connection.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
-    }
-    const [rows] = await connection.execute<RowDataPacket[]>('SELECT * FROM users WHERE id = ?', [id]);
-    const updatedUser = rows[0];
-    res.status(200).json({ message: 'Profil aktualisiert', user: { id: updatedUser.id, username: updatedUser.username, role: updatedUser.role, firstname: updatedUser.firstname, lastname: updatedUser.lastname, email: updatedUser.email, salutation: updatedUser.salutation } });
-  } catch (error) { 
-    console.error(error);
-    res.status(500).json({ message: 'Fehler beim Aktualisieren.' });
-  } finally {
-    if (connection) await connection.end();
-  }
-});
-
 // ==========================================
-// AUCTION ROUTES
+// 5. AUCTION ROUTES
 // ==========================================
 
-// 1. Alle Auktionen laden
+// A) Alle Auktionen laden
 app.get('/api/auctions', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
@@ -378,14 +400,14 @@ app.get('/api/auctions', async (req: Request, res: Response) => {
   }
 });
 
-// 2. Einzelne Auktion laden (MIT FOTO / MEDIA URL)
+// B) Einzelne Auktion laden (MIT FOTO)
 app.get('/api/auctions/:id', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     const { id } = req.params;
     connection = await mysql.createConnection(dbConfig);
     
-    // WICHTIG: Hier ist "ads.media_url as mediaUrl" dabei!
+    // "media_url" laden
     const auctionQuery = `
       SELECT 
         a.id, a.ad_space_id, a.start_time, a.end_time, a.status, a.minimum_bid_floor, 
@@ -417,7 +439,7 @@ app.get('/api/auctions/:id', async (req: Request, res: Response) => {
       endTime: auction.end_time,
       status: auction.status, 
       minimumBidFloor: auction.minimum_bid_floor, 
-      mediaUrl: auction.mediaUrl, // Das Bild für das Frontend
+      mediaUrl: auction.mediaUrl, // Das Foto
       totalBids: bids.length,
       allBids: bids.map((bid: RowDataPacket) => ({
         id: bid.id, auctionId: id, advertiserId: bid.advertiser_id, advertiserName: bid.advertiserName, campaignName: bid.campaign_name, bidAmountCPM: parseFloat(bid.bid_amount), submitTime: bid.created_at, status: bid.status
@@ -431,7 +453,7 @@ app.get('/api/auctions/:id', async (req: Request, res: Response) => {
   }
 });
 
-// 3. Neue Auktion erstellen
+// C) Neue Auktion erstellen
 app.post('/api/auctions', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
@@ -457,7 +479,7 @@ app.post('/api/auctions', async (req: Request, res: Response) => {
   }
 });
 
-// 4. Gebot abgeben
+// D) Gebot auf Auktion abgeben
 app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
