@@ -5,8 +5,9 @@ export default function Login() {
   // State für die Eingabefelder
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
+  // NEU: State für Checkbox
+  const [rememberMe, setRememberMe] = useState(false);
   
-  // State für Feedback
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,9 +22,11 @@ export default function Login() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ 
           identifier: identifier, 
-          password: password 
+          password: password,
+          rememberMe: rememberMe // <--- NEU: Checkbox-Wert mitsenden
         }),
       });
 
@@ -31,23 +34,13 @@ export default function Login() {
 
       if (response.ok) {
         console.log('Login erfolgreich:', data);
-        
-        // 1. Benutzer speichern
         localStorage.setItem('user', JSON.stringify(data));
         
-        // 2. Weiterleiten (mit Reload)
         switch (data.role) {
-          case 'Publisher':
-            window.location.href = '/publisher';
-            break;
-          case 'Advertiser':
-            window.location.href = '/advertiser';
-            break;
-          case 'Admin':
-            window.location.href = '/admin';
-            break;
-          default:
-            window.location.href = '/'; 
+          case 'Publisher': window.location.href = '/publisher'; break;
+          case 'Advertiser': window.location.href = '/advertiser'; break;
+          case 'Admin': window.location.href = '/admin'; break;
+          default: window.location.href = '/'; 
         }
 
       } else {
@@ -56,7 +49,7 @@ export default function Login() {
 
     } catch (err) {
       console.error("Login Fehler:", err);
-      setError('Keine Verbindung zum Server möglich. Läuft das Backend auf Port 3001?');
+      setError('Keine Verbindung zum Server möglich.');
     } finally {
       setLoading(false);
     }
@@ -96,6 +89,20 @@ export default function Login() {
               style={styles.input}
               placeholder="••••••••"
             />
+          </div>
+
+          {/* NEU: Checkbox für Remember Me */}
+          <div style={styles.checkboxContainer}>
+            <input 
+              type="checkbox" 
+              id="rememberMe" 
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              style={styles.checkbox}
+            />
+            <label htmlFor="rememberMe" style={styles.checkboxLabel}>
+              Angemeldet bleiben
+            </label>
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
@@ -157,6 +164,22 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: '1px solid #d1d5db',
     borderRadius: '4px',
     fontSize: '1rem',
+  },
+  // NEUE STYLES FÜR CHECKBOX
+  checkboxContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+  },
+  checkbox: {
+    width: '16px',
+    height: '16px',
+    cursor: 'pointer',
+  },
+  checkboxLabel: {
+    fontSize: '0.9rem',
+    color: '#374151',
+    cursor: 'pointer',
   },
   button: {
     backgroundColor: '#2563eb',

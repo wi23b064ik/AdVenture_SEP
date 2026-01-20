@@ -10,15 +10,17 @@ import BiddingPage from "./pages/BiddingPage";
 import Navbar from "./pages/NavBar"; 
 import Login from "./pages/login"; 
 import Register from "./pages/register";
-
-// NEU: Profil Seite importieren
 import ProfilePage from "./pages/ProfilePage.tsx"; 
+
+// --- NEU: Import für die Detailseite ---
+import AuctionDetails from "./pages/AuctionDetails"; 
 
 function App() {
   return (
     <Router>
       <Navbar />
       <Routes>
+        {/* Bestehende Routen */}
         <Route path="/advertiser" element={<AdvertiserPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/publisher" element={<PublisherPage />} />
@@ -26,9 +28,11 @@ function App() {
         
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
-        {/* --- NEU: Route für das Profil --- */}
         <Route path="/profile" element={<ProfilePage />} />
+
+        {/* --- NEU: Die Route für die Detailansicht --- */}
+        {/* ":id" ist ein Platzhalter, der z.B. "123" fängt */}
+        <Route path="/auction/:id" element={<AuctionDetails />} />
 
       </Routes>
     </Router>
