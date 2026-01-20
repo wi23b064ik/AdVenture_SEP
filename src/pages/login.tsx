@@ -26,14 +26,14 @@ export default function Login() {
         body: JSON.stringify({ 
           identifier: identifier, 
           password: password,
-          rememberMe: rememberMe // <--- NEU: Checkbox-Wert mitsenden
+          rememberMe: rememberMe 
         }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        console.log('Login erfolgreich:', data);
+        console.log('Login successfull:', data);
         localStorage.setItem('user', JSON.stringify(data));
         
         switch (data.role) {
@@ -44,12 +44,12 @@ export default function Login() {
         }
 
       } else {
-        setError(data.message || 'Login fehlgeschlagen');
+        setError(data.message || 'Login failure');
       }
 
     } catch (err) {
-      console.error("Login Fehler:", err);
-      setError('Keine Verbindung zum Server möglich.');
+      console.error("Login Error:", err);
+      setError('No connection to the Server.');
     } finally {
       setLoading(false);
     }
@@ -58,15 +58,15 @@ export default function Login() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Willkommen zurück</h2>
-        <p style={styles.subtitle}>Bitte melden Sie sich an</p>
+        <h2 style={styles.title}>Welcome back</h2>
+        <p style={styles.subtitle}>Please Login</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
         <form onSubmit={handleLogin} style={styles.form}>
           
           <div style={styles.inputGroup}>
-            <label style={styles.label} htmlFor="identifier">Benutzername oder E-Mail</label>
+            <label style={styles.label} htmlFor="identifier">Username or E-Mail</label>
             <input
               id="identifier"
               type="text"
@@ -74,12 +74,12 @@ export default function Login() {
               onChange={(e) => setIdentifier(e.target.value)}
               required
               style={styles.input}
-              placeholder="Ihr Benutzername"
+              placeholder="Your Username"
             />
           </div>
 
           <div style={styles.inputGroup}>
-            <label style={styles.label} htmlFor="password">Passwort</label>
+            <label style={styles.label} htmlFor="password">Password</label>
             <input
               id="password"
               type="password"
@@ -101,12 +101,12 @@ export default function Login() {
               style={styles.checkbox}
             />
             <label htmlFor="rememberMe" style={styles.checkboxLabel}>
-              Angemeldet bleiben
+              Remember me
             </label>
           </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Wird geladen...' : 'Anmelden'}
+            {loading ? 'Loading...' : 'Login'}
           </button>
         </form>
       </div>

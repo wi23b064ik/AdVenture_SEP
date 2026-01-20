@@ -39,11 +39,11 @@ export default function PublisherPage() {
       const res = await fetch(`http://localhost:3001/api/ad-spaces/publisher/${user.id}`);
       const data = await res.json();
       setAdSpaces(data);
-    } catch (err) { console.error("Ladefehler:", err); }
+    } catch (err) { console.error("Loading error:", err); }
   };
 
   const addAdSpace = async () => {
-    if (!formData.name) return alert("Bitte Namen eingeben");
+    if (!formData.name) return alert("Please enter a Name");
 
     try {
       // WICHTIG: Wir nutzen FormData für Datei-Uploads
@@ -69,7 +69,7 @@ export default function PublisherPage() {
       });
 
       if (res.ok) {
-        alert("Werbefläche erstellt!");
+        alert("Adspace created!");
         // Reset
         setFormData({
           name: "", category: "Technology", width: 728, height: 90,
@@ -78,7 +78,7 @@ export default function PublisherPage() {
         setSelectedFile(null);
         fetchMyAdSpaces();
       } else {
-        alert("Fehler beim Speichern");
+        alert("Saving error");
       }
     } catch (err) { console.error(err); }
   };
@@ -94,11 +94,11 @@ export default function PublisherPage() {
     }
   };
 
-  if (!user) return <div style={{padding:'2rem'}}>Bitte einloggen.</div>;
+  if (!user) return <div style={{padding:'2rem'}}>Please Login.</div>;
 
   return (
     <div style={styles.container}>
-      <h2>Publisher Portal (Angemeldet: {user.username})</h2>
+      <h2>Publisher Portal (Logged: {user.username})</h2>
       
       <div style={styles.formSection}>
         <h3>Create New Ad Space</h3>
@@ -120,7 +120,7 @@ export default function PublisherPage() {
 
           {/* Datei Upload */}
           <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
-            <label>Vorschau-Bild oder Video hochladen</label>
+            <label>Upload preview image or video</label>
             <input type="file" accept="image/*,video/*" onChange={handleFileChange} style={styles.input} />
           </div>
 
@@ -168,10 +168,10 @@ export default function PublisherPage() {
                   )}
                 </div>
               ) : (
-                <div style={styles.placeholder}>Kein Bild</div>
+                <div style={styles.placeholder}>No picture</div>
               )}
 
-              <p style={styles.cardText}>Größe: {space.width}x{space.height}</p>
+              <p style={styles.cardText}>Size: {space.width}x{space.height}</p>
               <p style={styles.cardText}>Min. Bid: €{space.min_bid}</p>
               <p style={{fontSize:'0.8rem', color:'#666'}}>{space.description}</p>
             </div>
