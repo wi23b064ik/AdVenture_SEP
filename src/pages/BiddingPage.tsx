@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom"; 
+
+// === TYPEN & INTERFACES ===
 
 interface Auction {
   id: string;
@@ -14,6 +17,7 @@ interface Auction {
     advertiserId: string;
     bidAmountCPM: number;
     campaignName: string;
+    advertiserName: string;
   };
   allBids: BidSubmission[];
 }
@@ -38,7 +42,37 @@ interface AdSpace {
   category: string;
 }
 
+// Hilfs-Interfaces für die "rohen" Daten vom Server
+interface RawBid {
+  id: string;
+  auctionId: string;
+  advertiserId: string;
+  advertiserName?: string;
+  campaignName: string;
+  campaignId: string;
+  bidAmountCPM: number | string;
+  submitTime: string;
+  status: "pending" | "accepted" | "rejected" | "won" | "lost";
+}
+
+interface RawAuction {
+  id: string;
+  adSpaceName: string;
+  adSpaceId: string;
+  publisherId: string;
+  startTime: string;
+  endTime: string;
+  status: "open" | "closed";
+  minimumBidFloor: number | string;
+  totalBids: number;
+  allBids: RawBid[];
+  winningBid?: unknown; 
+}
+
+// === COMPONENT ===
+
 export default function BiddingPage() {
+  const navigate = useNavigate(); 
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,74 +85,76 @@ export default function BiddingPage() {
   const [creatingAuction, setCreatingAuction] = useState(false);
   const [expandedBidResults, setExpandedBidResults] = useState<{ [key: string]: boolean }>({});
 
-  // Get user role from localStorage
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       try {
         const user = JSON.parse(userData);
         setUserRole(user.role);
-      } catch (e) {
+      } catch {
         console.log("Could not parse user data");
       }
     }
   }, []);
 
-  // Fetch publisher's ad spaces
   const fetchPublisherAdSpaces = async (publisherId: string) => {
     try {
       const response = await fetch(`http://localhost:3001/api/ad-spaces/publisher/${publisherId}`);
       if (!response.ok) throw new Error("Failed to fetch ad spaces");
       const data = await response.json();
       setPublisherAdSpaces(data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Error fetching ad spaces:", err);
     }
   };
 
-  // Fetch auctions from API
-  const fetchAuctions = async () => {
+  const fetchAuctions = useCallback(async () => {
     try {
-      setLoading(true);
       const response = await fetch("http://localhost:3001/api/auctions");
       if (!response.ok) throw new Error("Failed to fetch auctions");
       
-      const data = await response.json();
+      const data = await response.json() as RawAuction[];
       
-      // Convert string dates to Date objects and convert snake_case to camelCase
-      const auctionsWithDates = data.map((auction: any) => ({
+      const auctionsWithDates: Auction[] = data.map((auction) => ({
         id: auction.id,
-        adSpaceId: auction.ad_space_id,
+        adSpaceId: auction.adSpaceId,
         adSpaceName: auction.adSpaceName,
-        startTime: new Date(auction.start_time),
-        endTime: new Date(auction.end_time),
+        publisherId: auction.publisherId,
+        startTime: new Date(auction.startTime), 
+        endTime: new Date(auction.endTime),
         status: auction.status,
-        minimumBidFloor: parseFloat(auction.minimum_bid_floor) || 0,
+        minimumBidFloor: typeof auction.minimumBidFloor === 'string' ? parseFloat(auction.minimumBidFloor) : auction.minimumBidFloor,
         totalBids: auction.totalBids || 0,
-        allBids: (auction.allBids || []).map((bid: any) => ({
+        allBids: (auction.allBids || []).map((bid) => ({
           id: bid.id,
           auctionId: auction.id,
-          advertiserId: bid.advertiser_id || bid.advertiserId,
-          advertiserName: bid.advertiserName || bid.advertiser_name,
-          campaignName: bid.campaign_name || bid.campaignName || 'Unknown',
-          campaignId: bid.campaign_id || bid.campaignId,
-          bidAmountCPM: parseFloat(bid.bid_amount) || parseFloat(bid.bidAmountCPM) || 0,
-          submitTime: new Date(bid.created_at || bid.submitTime),
+          advertiserId: bid.advertiserId,
+          advertiserName: bid.advertiserName,
+          campaignName: bid.campaignName || 'Unknown',
+          campaignId: bid.campaignId || "", 
+          bidAmountCPM: typeof bid.bidAmountCPM === 'string' ? parseFloat(bid.bidAmountCPM) : bid.bidAmountCPM,
+          submitTime: new Date(bid.submitTime),
           status: bid.status,
         })),
+        winningBid: auction.winningBid as Auction['winningBid']
       }));
       
       setAuctions(auctionsWithDates);
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+    } catch (err: unknown) {
       console.error("Error fetching auctions:", err);
+      setLoading((prev) => {
+          if(prev) {
+             const message = err instanceof Error ? err.message : "An error occurred";
+             setError(message);
+          }
+          return false;
+      });
     } finally {
       setLoading(false);
     }
-  };
+  }, []); 
 
-  // Create new auction
   const handleStartAuction = async () => {
     if (!auctionFormData.adSpaceId || !auctionFormData.durationSeconds) {
       alert("Please select an ad space and set duration");
@@ -133,6 +169,7 @@ export default function BiddingPage() {
       const response = await fetch("http://localhost:3001/api/auctions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           ad_space_id: parseInt(auctionFormData.adSpaceId),
           start_time: now.toISOString(),
@@ -148,24 +185,23 @@ export default function BiddingPage() {
       } else {
         alert("Auction started successfully!");
         setAuctionFormData({ adSpaceId: "", durationSeconds: "60" });
-        fetchAuctions(); // Refresh auctions list
+        fetchAuctions();
       }
-    } catch (err) {
-      alert("Failed to start auction: " + (err instanceof Error ? err.message : "Unknown error"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      alert("Failed to start auction: " + message);
     } finally {
       setCreatingAuction(false);
     }
   };
 
-  // Fetch auctions on component mount
   useEffect(() => {
+    setLoading(true);
     fetchAuctions();
-    // Refresh auctions every 5 seconds to check for status changes
-    const refreshInterval = setInterval(fetchAuctions, 5000);
+    const refreshInterval = setInterval(fetchAuctions, 3000);
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [fetchAuctions]);
 
-  // Fetch publisher's ad spaces when user role is determined
   useEffect(() => {
     if (userRole === "Publisher") {
       const userData = localStorage.getItem("user");
@@ -173,14 +209,13 @@ export default function BiddingPage() {
         try {
           const user = JSON.parse(userData);
           fetchPublisherAdSpaces(user.id);
-        } catch (e) {
+        } catch {
           console.log("Could not parse user data");
         }
       }
     }
   }, [userRole]);
 
-  // Handle bid submission
   const handlePlaceBid = async (auctionId: string) => {
     const bidData = bidFormData[auctionId];
     if (!bidData || !bidData.campaignId || !bidData.bidAmount) {
@@ -202,9 +237,10 @@ export default function BiddingPage() {
       const response = await fetch(`http://localhost:3001/api/auctions/${auctionId}/bids`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           campaign_id: parseInt(bidData.campaignId),
-          advertiser_id: user.id, // Use logged-in user's ID
+          advertiser_id: user.id, 
           bid_amount: parseFloat(bidData.bidAmount),
         }),
       });
@@ -216,28 +252,31 @@ export default function BiddingPage() {
       } else {
         alert("Bid placed successfully!");
         setBidFormData({ ...bidFormData, [auctionId]: { campaignId: "", bidAmount: "" } });
-        fetchAuctions(); // Refresh to see the new bid
+        fetchAuctions();
       }
-    } catch (err) {
-      alert("Failed to place bid: " + (err instanceof Error ? err.message : "Unknown error"));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      alert("Failed to place bid: " + message);
     } finally {
       setPlacingBid({ ...placingBid, [auctionId]: false });
     }
   };
 
-  // Update countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
       const updated: { [key: string]: string } = {};
+      const now = new Date().getTime();
+
       auctions.forEach((auction) => {
         if (auction.status === "open") {
-          const diff = auction.endTime.getTime() - Date.now();
+          const diff = auction.endTime.getTime() - now;
+          
           if (diff > 0) {
             const seconds = Math.floor((diff / 1000) % 60);
             const minutes = Math.floor((diff / 1000 / 60) % 60);
             updated[auction.id] = `${minutes}m ${seconds}s`;
           } else {
-            updated[auction.id] = "Closed";
+            updated[auction.id] = "Closing..."; 
           }
         } else {
           updated[auction.id] = "Closed";
@@ -248,13 +287,6 @@ export default function BiddingPage() {
 
     return () => clearInterval(timer);
   }, [auctions]);
-
-  const getWinningBid = (auction: Auction): BidSubmission | null => {
-    if (auction.allBids.length === 0) return null;
-    return auction.allBids.reduce((prev, curr) =>
-      curr.bidAmountCPM > prev.bidAmountCPM ? curr : prev
-    );
-  };
 
   const closedAuctions = auctions.filter((a) => a.status === "closed");
   const openAuctions = auctions.filter((a) => a.status === "open");
@@ -326,12 +358,12 @@ export default function BiddingPage() {
       {error && (
         <div style={styles.errorBox}>
           <p>⚠️ Error: {error}</p>
-          <button onClick={fetchAuctions} style={styles.retryButton}>Retry</button>
+          <button onClick={() => fetchAuctions()} style={styles.retryButton}>Retry</button>
         </div>
       )}
 
       {/* Loading State */}
-      {loading && (
+      {loading && auctions.length === 0 && (
         <div style={styles.loadingBox}>
           <p>Loading auctions...</p>
         </div>
@@ -396,7 +428,13 @@ export default function BiddingPage() {
                   )}
                 </div>
 
-                <button style={styles.detailsButton}>View Details</button>
+                {/* Button zu Details */}
+                <button 
+                  style={styles.detailsButton}
+                  onClick={() => navigate(`/auction/${auction.id}`)}
+                >
+                  View Details
+                </button>
 
                 {/* Bid Placement Form - ONLY FOR ADVERTISERS */}
                 {auction.status === "open" && userRole === "Advertiser" && (
@@ -406,7 +444,7 @@ export default function BiddingPage() {
                       <label style={styles.label}>Campaign ID:</label>
                       <input
                         type="number"
-                        placeholder="Enter campaign ID (1, 2, or 3)"
+                        placeholder="Enter campaign ID"
                         value={bidFormData[auction.id]?.campaignId || ""}
                         onChange={(e) =>
                           setBidFormData({
@@ -480,7 +518,7 @@ export default function BiddingPage() {
         ) : (
           <div>
             {closedAuctions.map((auction) => {
-              const winner = getWinningBid(auction);
+              const winner = auction.winningBid || (auction.allBids.length > 0 ? auction.allBids[0] : null);
               const currentUser = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!) : null;
               const isCurrentUserWinner = winner && currentUser && winner.advertiserId === currentUser.id;
               
@@ -517,12 +555,20 @@ export default function BiddingPage() {
                           </p>
                         </>
                       ) : (
-                        <p>No bids</p>
+                        <p style={{color: 'white', fontWeight: 'bold'}}>No bids</p>
                       )}
                     </div>
                   </div>
 
                   <div style={styles.bidComparison}>
+                    {/* --- NEU: HIER WURDE DER BUTTON HINZUGEFÜGT --- */}
+                    <button 
+                      style={{...styles.detailsButton, marginBottom: '15px'}}
+                      onClick={() => navigate(`/auction/${auction.id}`)}
+                    >
+                      View Details
+                    </button>
+
                     {auction.allBids.length > 0 && (
                       <>
                         <button
@@ -545,7 +591,7 @@ export default function BiddingPage() {
                                   style={{
                                     ...styles.bidResultRow,
                                     backgroundColor:
-                                      bid.status === "won" ? "#d1fae5" : "#f3f4f6",
+                                      bid.status === "won" || idx === 0 ? "#d1fae5" : "#f3f4f6",
                                   }}
                                 >
                                   <span>
@@ -556,11 +602,11 @@ export default function BiddingPage() {
                                   </span>
                                   <span
                                     style={{
-                                      color: bid.status === "won" ? "#16a34a" : "#9ca3af",
-                                      fontWeight: bid.status === "won" ? "bold" : "normal",
+                                      color: bid.status === "won" || idx === 0 ? "#16a34a" : "#9ca3af",
+                                      fontWeight: bid.status === "won" || idx === 0 ? "bold" : "normal",
                                     }}
                                   >
-                                    {bid.status === "won" ? "🏆 Won" : "Lost"}
+                                    {bid.status === "won" || idx === 0 ? "🏆 Won" : "Lost"}
                                   </span>
                                 </div>
                               ))}
