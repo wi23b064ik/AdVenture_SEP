@@ -32,7 +32,7 @@ export default function Register() {
 
     // Passwort-Bestätigung prüfen
     if (formData.password !== formData.confirmPassword) {
-      setError('Die Passwörter stimmen nicht überein.');
+      setError('The passwords do not match.');
       setLoading(false);
       return;
     }
@@ -56,14 +56,14 @@ export default function Register() {
       const data = await response.json();
 
       if (response.ok) {
-        alert('Registrierung erfolgreich! Sie können sich jetzt einloggen.');
+        alert('Registration successfull! Please login.');
         navigate('/login');
       } else {
-        setError(data.message || 'Registrierung fehlgeschlagen.');
+        setError(data.message || 'Registration failed.');
       }
     } catch (err) {
       console.error(err);
-      setError('Server nicht erreichbar.');
+      setError('Server unreachable.');
     } finally {
       setLoading(false);
     }
@@ -72,8 +72,8 @@ export default function Register() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2 style={styles.title}>Neuen Account erstellen</h2>
-        <p style={styles.subtitle}>Werden Sie Teil von AdVenture</p>
+        <h2 style={styles.title}>Create new Account</h2>
+        <p style={styles.subtitle}>Be a part of AdVenture</p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
@@ -82,43 +82,43 @@ export default function Register() {
           {/* Rolle und Anrede */}
           <div style={styles.row}>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Ich bin ein:</label>
+              <label style={styles.label}>I am:</label>
               <select name="role" value={formData.role} onChange={handleChange} style={styles.input}>
                 <option value="Publisher">Publisher</option>
                 <option value="Advertiser">Advertiser</option>
               </select>
             </div>
             <div style={styles.inputGroup}>
-              <label style={styles.label}>Anrede</label>
+              <label style={styles.label}>Salutation</label>
               <select name="salutation" value={formData.salutation} onChange={handleChange} style={styles.input}>
-                <option value="Herr">Herr</option>
-                <option value="Frau">Frau</option>
-                <option value="Divers">Divers</option>
+                <option value="Herr">Mr.</option>
+                <option value="Frau">Ms.</option>
+                <option value="Divers">Diverse</option>
               </select>
             </div>
           </div>
 
           {/* Name */}
           <div style={styles.row}>
-            <input name="firstname" placeholder="Vorname" required onChange={handleChange} style={styles.input} />
-            <input name="lastname" placeholder="Nachname" required onChange={handleChange} style={styles.input} />
+            <input name="firstname" placeholder="Firstname" required onChange={handleChange} style={styles.input} />
+            <input name="lastname" placeholder="Lastname" required onChange={handleChange} style={styles.input} />
           </div>
 
           {/* Geburtsdatum */}
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Geburtsdatum</label>
+            <label style={styles.label}>Date of birth</label>
             <input type="date" name="date_of_birth" required onChange={handleChange} style={styles.input} />
           </div>
 
           {/* Login Daten */}
-          <input name="username" placeholder="Benutzername" required onChange={handleChange} style={styles.input} />
-          <input type="email" name="email" placeholder="E-Mail Adresse" required onChange={handleChange} style={styles.input} />
+          <input name="username" placeholder="Username" required onChange={handleChange} style={styles.input} />
+          <input type="email" name="email" placeholder="E-Mail" required onChange={handleChange} style={styles.input} />
           
-          <input type="password" name="password" placeholder="Passwort" required onChange={handleChange} style={styles.input} />
-          <input type="password" name="confirmPassword" placeholder="Passwort wiederholen" required onChange={handleChange} style={styles.input} />
+          <input type="password" name="password" placeholder="Password" required onChange={handleChange} style={styles.input} />
+          <input type="password" name="confirmPassword" placeholder="Repeat password" required onChange={handleChange} style={styles.input} />
 
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Registriere...' : 'Kostenlos Registrieren'}
+            {loading ? 'Registration...' : 'Free Registration'}
           </button>
         </form>
       </div>

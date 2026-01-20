@@ -97,19 +97,19 @@ export default function ProfilePage() {
   return (
     <div style={styles.container}>
       <div style={styles.headerRow}>
-        <h2>👥 Verwaltung aller Profile</h2>
-        <button onClick={fetchUsers} style={styles.refreshButton}>🔄 Aktualisieren</button>
+        <h2>👥 Managing all profiles</h2>
+        <button onClick={fetchUsers} style={styles.refreshButton}>🔄 Refresh</button>
       </div>
 
       <table style={styles.table}>
         <thead>
           <tr style={styles.trHead}>
             <th style={styles.th}>ID</th>
-            <th style={styles.th}>Benutzername</th>
-            <th style={styles.th}>Rolle</th>
+            <th style={styles.th}>Username</th>
+            <th style={styles.th}>Role</th>
             <th style={styles.th}>Name</th>
             <th style={styles.th}>E-Mail</th>
-            <th style={styles.th}>Aktion</th>
+            <th style={styles.th}>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -129,7 +129,7 @@ export default function ProfilePage() {
                   onClick={() => handleEditClick(user)} 
                   style={styles.editButton}
                 >
-                  ✏️ Bearbeiten
+                  ✏️ Edit
                 </button>
               </td>
             </tr>
@@ -141,12 +141,12 @@ export default function ProfilePage() {
       {showModal && editingUser && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
-            <h3>Benutzer bearbeiten: {editingUser.username}</h3>
+            <h3>Edit User: {editingUser.username}</h3>
             
             <form onSubmit={handleSave} style={styles.form}>
               
               <div style={styles.formGroup}>
-                <label style={styles.label}>Rolle:</label>
+                <label style={styles.label}>Role:</label>
                 <select 
                   value={formData.role} 
                   onChange={e => setFormData({...formData, role: e.target.value})}
@@ -159,7 +159,7 @@ export default function ProfilePage() {
               </div>
 
               <div style={styles.formGroup}>
-                <label style={styles.label}>Benutzername:</label>
+                <label style={styles.label}>Username:</label>
                 <input 
                   type="text" 
                   value={formData.username}
@@ -170,7 +170,7 @@ export default function ProfilePage() {
 
               <div style={styles.row}>
                 <div style={{...styles.formGroup, flex: 1}}>
-                  <label style={styles.label}>Vorname:</label>
+                  <label style={styles.label}>Firstname:</label>
                   <input 
                     type="text" 
                     value={formData.firstname}
@@ -179,7 +179,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div style={{...styles.formGroup, flex: 1}}>
-                  <label style={styles.label}>Nachname:</label>
+                  <label style={styles.label}>Lastname:</label>
                   <input 
                     type="text" 
                     value={formData.lastname}
