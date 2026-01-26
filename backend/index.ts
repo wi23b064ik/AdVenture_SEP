@@ -143,32 +143,58 @@ app.post('/api/register', async (req: Request, res: Response) => {
 });
 
 // ==========================================
-// 3. ADMIN / USER ROUTEN
+// 3. ADMIN / USER ROUTEN (GESICHERT)
 // ==========================================
 
-// A) Alle User laden
+// A) Alle User laden (GESCHÜTZT: Nur für Admins!)
 app.get('/api/users', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
+    // 1. Wer fragt an? (Wir lesen die ID aus der URL: /api/users?requesterId=5)
+    const { requesterId } = req.query;
+
+    if (!requesterId) {
+      return res.status(401).json({ message: 'Keine Berechtigung (ID fehlt).' });
+    }
+
     connection = await mysql.createConnection(dbConfig);
+
+    // 2. Prüfen: Ist diese ID ein Admin?
+    const [adminCheck] = await connection.execute<RowDataPacket[]>(
+      'SELECT role FROM users WHERE id = ?', 
+      [requesterId]
+    );
+
+    if (adminCheck.length === 0 || adminCheck[0].role !== 'Admin') {
+      return res.status(403).json({ message: 'Zugriff verweigert. Nur für Admins.' });
+    }
+
+    // 3. Wenn Admin: Alle User laden
     const query = 'SELECT id, username, email, role, firstname, lastname, salutation FROM users';
     const [rows] = await connection.execute<RowDataPacket[]>(query);
+    
     return res.status(200).json(rows);
+
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Serverfehler beim Laden der Benutzer.' });
+    return res.status(500).json({ message: 'Serverfehler.' });
   } finally {
     if (connection) await connection.end();
   }
 });
 
-// B) Einzelnen User laden
+// B) Einzelnen User laden (Für das eigene Profil)
+// Das ist okay so: Der User ruft /api/users/SEINE_EIGENE_ID auf.
 app.get('/api/users/:id', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     const { id } = req.params;
     connection = await mysql.createConnection(dbConfig);
-    const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', [id]);
+    
+    const [rows] = await connection.execute<RowDataPacket[]>(
+      'SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', 
+      [id]
+    );
     
     if (rows.length === 0) return res.status(404).json({ message: 'User nicht gefunden' });
     
@@ -181,7 +207,7 @@ app.get('/api/users/:id', async (req: Request, res: Response) => {
   }
 });
 
-// C) User bearbeiten (Update - ohne Passwort)
+// C) User bearbeiten (Update)
 app.put('/api/users/:id', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
@@ -190,26 +216,22 @@ app.put('/api/users/:id', async (req: Request, res: Response) => {
 
     connection = await mysql.createConnection(dbConfig);
 
-    const query = `
-      UPDATE users 
-      SET firstname = ?, lastname = ?, email = ?, username = ?, role = ?, salutation = ? 
-      WHERE id = ?
-    `;
-    
-    await connection.execute(query, [firstname, lastname, email, username, role, salutation, id]);
+    // Update Basic Info
+    await connection.execute(
+      'UPDATE users SET firstname = ?, lastname = ?, email = ?, username = ?, role = ?, salutation = ? WHERE id = ?', 
+      [firstname, lastname, email, username, role, salutation, id]
+    );
 
-    // Wenn ein Passwort mitgesendet wurde (optional), ändern wir es separat
+    // Update Password (Optional)
     if (req.body.password && req.body.password.trim() !== "") {
       const hashedPassword = await bcrypt.hash(req.body.password, 10);
       await connection.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
     }
 
+    // Updated User zurücksenden (damit das Frontend die neuen Daten hat)
     const [rows] = await connection.execute<RowDataPacket[]>('SELECT id, username, email, role, firstname, lastname, salutation FROM users WHERE id = ?', [id]);
     
-    res.status(200).json({ 
-      message: 'Profil aktualisiert', 
-      user: rows[0] 
-    });
+    res.status(200).json({ message: 'Profil aktualisiert', user: rows[0] });
 
   } catch (error) {
     console.error(error);
