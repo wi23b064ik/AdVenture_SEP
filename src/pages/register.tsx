@@ -10,7 +10,7 @@ export default function Register() {
     firstname: '',
     lastname: '',
     date_of_birth: '',
-    role: 'Publisher', // Standardwert
+    role: 'Publisher',
     username: '',
     email: '',
     password: '',
@@ -20,7 +20,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Handler für Änderungen in den Inputs
+  // Handler für Änderungen
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -30,7 +30,6 @@ export default function Register() {
     setLoading(true);
     setError('');
 
-    // Passwort-Bestätigung prüfen
     if (formData.password !== formData.confirmPassword) {
       setError('The passwords do not match.');
       setLoading(false);
@@ -79,7 +78,7 @@ export default function Register() {
 
         <form onSubmit={handleRegister} style={styles.form}>
           
-          {/* Rolle und Anrede */}
+          {/* Zeile 1: Rolle und Anrede */}
           <div style={styles.row}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>I am:</label>
@@ -98,24 +97,47 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Name */}
+          {/* Zeile 2: Vorname und Nachname (Korrigiert) */}
           <div style={styles.row}>
-            <input name="firstname" placeholder="Firstname" required onChange={handleChange} style={styles.input} />
-            <input name="lastname" placeholder="Lastname" required onChange={handleChange} style={styles.input} />
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Firstname</label>
+              <input name="firstname" placeholder="Firstname" required onChange={handleChange} style={styles.input} />
+            </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Lastname</label>
+              <input name="lastname" placeholder="Lastname" required onChange={handleChange} style={styles.input} />
+            </div>
           </div>
 
-          {/* Geburtsdatum */}
+          {/* Zeile 3: Geburtsdatum */}
           <div style={styles.inputGroup}>
             <label style={styles.label}>Date of birth</label>
             <input type="date" name="date_of_birth" required onChange={handleChange} style={styles.input} />
           </div>
 
-          {/* Login Daten */}
-          <input name="username" placeholder="Username" required onChange={handleChange} style={styles.input} />
-          <input type="email" name="email" placeholder="E-Mail" required onChange={handleChange} style={styles.input} />
+          {/* Zeile 4: Username (Label hinzugefügt) */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Username</label>
+            <input name="username" placeholder="Username" required onChange={handleChange} style={styles.input} />
+          </div>
+
+          {/* Zeile 5: E-Mail (Label hinzugefügt) */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>E-Mail</label>
+            <input type="email" name="email" placeholder="E-Mail" required onChange={handleChange} style={styles.input} />
+          </div>
           
-          <input type="password" name="password" placeholder="Password" required onChange={handleChange} style={styles.input} />
-          <input type="password" name="confirmPassword" placeholder="Repeat password" required onChange={handleChange} style={styles.input} />
+          {/* Zeile 6: Passwort (Label hinzugefügt) */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Password</label>
+            <input type="password" name="password" placeholder="Password" required onChange={handleChange} style={styles.input} />
+          </div>
+
+          {/* Zeile 7: Passwort wiederholen (Label hinzugefügt) */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Repeat password</label>
+            <input type="password" name="confirmPassword" placeholder="Repeat password" required onChange={handleChange} style={styles.input} />
+          </div>
 
           <button type="submit" disabled={loading} style={styles.button}>
             {loading ? 'Registration...' : 'Free Registration'}
@@ -132,10 +154,15 @@ const styles: { [key: string]: React.CSSProperties } = {
   title: { fontSize: '1.5rem', fontWeight: 'bold', textAlign: 'center', marginBottom: '0.5rem', color: '#1f2937' },
   subtitle: { textAlign: 'center', color: '#6b7280', marginBottom: '1.5rem' },
   form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
-  row: { display: 'flex', gap: '1rem' }, // Für nebeneinanderliegende Felder
+  
+  // WICHTIG: Row sorgt dafür, dass Dinge nebeneinander stehen
+  row: { display: 'flex', gap: '1rem' }, 
+  
+  // WICHTIG: InputGroup sorgt dafür, dass Label ÜBER dem Input steht
   inputGroup: { display: 'flex', flexDirection: 'column', flex: 1 },
+  
   label: { fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem', color: '#374151' },
   input: { padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '1rem', width: '100%', boxSizing: 'border-box' },
-  button: { backgroundColor: '#10b981', color: 'white', padding: '0.75rem', border: 'none', borderRadius: '4px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '0.5rem' }, // Grün für Registration
+  button: { backgroundColor: '#10b981', color: 'white', padding: '0.75rem', border: 'none', borderRadius: '4px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '0.5rem' },
   errorBox: { backgroundColor: '#fee2e2', color: '#991b1b', padding: '0.75rem', borderRadius: '4px', fontSize: '0.875rem', marginBottom: '1rem', textAlign: 'center', border: '1px solid #fca5a5' },
 };
