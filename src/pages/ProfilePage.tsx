@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-// Typen
+// Types
 interface User {
   id: number;
   username: string;
@@ -16,7 +16,7 @@ export default function ProfilePage() {
   const currentUser = userString ? JSON.parse(userString) : null;
   const isAdmin = currentUser?.role === 'Admin';
 
-  // --- STATE FÜR ADMINS ---
+  // --- STATE FOR ADMINS ---
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,11 +27,11 @@ export default function ProfilePage() {
     username: "", email: "", role: "Publisher", firstname: "", lastname: "", salutation: "Herr"
   });
 
-  // --- STATE FÜR USER (Hier fehlten vorher Username & Co) ---
+  // --- STATE FOR USER ---
   const [myProfileForm, setMyProfileForm] = useState({
-    username: '', // Neu: Muss mitgeschickt werden
-    role: '',     // Neu: Muss mitgeschickt werden
-    salutation: '', // Neu: Muss mitgeschickt werden
+    username: '', 
+    role: '',     
+    salutation: '', 
     firstname: '', 
     lastname: '', 
     email: '', 
@@ -39,7 +39,7 @@ export default function ProfilePage() {
   });
 
   // =========================================================
-  // LOGIK FÜR ADMINS
+  // LOGIC FOR ADMINS
   // =========================================================
   const fetchUsers = async () => {
     if (!currentUser?.id) return;
@@ -48,9 +48,9 @@ export default function ProfilePage() {
       const response = await fetch(`http://localhost:3001/api/users?requesterId=${currentUser.id}`);
       
       if (response.status === 401 || response.status === 403) {
-        throw new Error("Keine Berechtigung (Nur Admins).");
+        throw new Error("Access denied (Admins only).");
       }
-      if (!response.ok) throw new Error("Fehler beim Laden der Benutzer");
+      if (!response.ok) throw new Error("Error loading users");
       
       const data = await response.json();
       setUsers(data);
@@ -58,7 +58,7 @@ export default function ProfilePage() {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError("Unbekannter Fehler");
+        setError("Unknown error");
       }
     } finally {
       setLoading(false);
@@ -90,21 +90,21 @@ export default function ProfilePage() {
       });
 
       if (response.ok) {
-        alert("Benutzer aktualisiert!");
+        alert("User updated successfully!");
         setShowModal(false);
         setEditingUser(null);
         fetchUsers();
       } else {
-        alert("Fehler beim Speichern");
+        alert("Error saving user");
       }
     } catch (err) {
       console.error(err);
-      alert("Serverfehler");
+      alert("Server error");
     }
   };
 
   // =========================================================
-  // LOGIK FÜR USER
+  // LOGIC FOR USERS
   // =========================================================
   const fetchMyProfile = async () => {
     if (!currentUser?.id) return;
@@ -112,7 +112,6 @@ export default function ProfilePage() {
       const res = await fetch(`http://localhost:3001/api/users/${currentUser.id}`);
       const data = await res.json();
       
-      // WICHTIG: Wir laden ALLE Daten in den State, auch die, die man nicht sieht
       setMyProfileForm({
         username: data.username || '',
         role: data.role || '',
@@ -127,7 +126,6 @@ export default function ProfilePage() {
 
   const handleMyProfileUpdate = async () => {
     try {
-      // Jetzt senden wir auch username, role und salutation mit!
       const res = await fetch(`http://localhost:3001/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -136,21 +134,19 @@ export default function ProfilePage() {
       const data = await res.json();
       
       if (res.ok) {
-        alert("Profil gespeichert!");
-        // Update LocalStorage
+        alert("Profile saved successfully!");
         localStorage.setItem('user', JSON.stringify({ ...currentUser, ...data.user }));
-        // Passwortfeld leeren
         setMyProfileForm(prev => ({ ...prev, password: '' }));
       } else {
-        alert("Fehler: " + (data.message || "Speichern fehlgeschlagen"));
+        alert("Error: " + (data.message || "Save failed"));
       }
     } catch (error) {
-      console.error("Update Fehler:", error);
-      alert("Fehler beim Speichern (Server nicht erreichbar)");
+      console.error("Update Error:", error);
+      alert("Error saving (Server unreachable)");
     }
   };
 
-  // === EFFEKTE ===
+  // === EFFECTS ===
   useEffect(() => {
     if (isAdmin) {
       fetchUsers();
@@ -160,20 +156,20 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
-  if (!currentUser) return <div style={{ padding: "20px" }}>Bitte einloggen</div>;
+  if (!currentUser) return <div style={{ padding: "20px" }}>Please log in.</div>;
 
   // =========================================================
-  // RENDER: ADMIN
+  // RENDER: ADMIN VIEW
   // =========================================================
   if (isAdmin) {
     return (
       <div style={styles.container}>
         <div style={styles.headerRow}>
-          <h2>👥 Verwaltung aller Profile</h2>
+          <h2>👥 Manage All Profiles</h2>
           <button onClick={fetchUsers} style={styles.refreshButton}>🔄 Refresh</button>
         </div>
 
-        {loading && <p>Lade...</p>}
+        {loading && <p>Loading...</p>}
         {error && <p style={{color:'red'}}>{error}</p>}
 
         <table style={styles.table}>
@@ -181,10 +177,10 @@ export default function ProfilePage() {
             <tr style={styles.trHead}>
               <th style={styles.th}>ID</th>
               <th style={styles.th}>Username</th>
-              <th style={styles.th}>Rolle</th>
+              <th style={styles.th}>Role</th>
               <th style={styles.th}>Name</th>
-              <th style={styles.th}>E-Mail</th>
-              <th style={styles.th}>Aktion</th>
+              <th style={styles.th}>Email</th>
+              <th style={styles.th}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -212,10 +208,10 @@ export default function ProfilePage() {
         {showModal && editingUser && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalContent}>
-              <h3>Benutzer bearbeiten: {editingUser.username}</h3>
+              <h3>Edit User: {editingUser.username}</h3>
               <form onSubmit={handleAdminSave} style={styles.form}>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Rolle:</label>
+                  <label style={styles.label}>Role:</label>
                   <select 
                     value={adminFormData.role} 
                     onChange={e => setAdminFormData({...adminFormData, role: e.target.value})}
@@ -232,21 +228,21 @@ export default function ProfilePage() {
                 </div>
                 <div style={styles.row}>
                   <div style={{...styles.formGroup, flex: 1}}>
-                    <label style={styles.label}>Vorname:</label>
+                    <label style={styles.label}>Firstname:</label>
                     <input style={styles.input} type="text" value={adminFormData.firstname} onChange={e => setAdminFormData({...adminFormData, firstname: e.target.value})} />
                   </div>
                   <div style={{...styles.formGroup, flex: 1}}>
-                    <label style={styles.label}>Nachname:</label>
+                    <label style={styles.label}>Lastname:</label>
                     <input style={styles.input} type="text" value={adminFormData.lastname} onChange={e => setAdminFormData({...adminFormData, lastname: e.target.value})} />
                   </div>
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>E-Mail:</label>
+                  <label style={styles.label}>Email:</label>
                   <input style={styles.input} type="email" value={adminFormData.email} onChange={e => setAdminFormData({...adminFormData, email: e.target.value})} />
                 </div>
                 <div style={styles.buttonGroup}>
-                  <button type="button" onClick={() => setShowModal(false)} style={styles.cancelButton}>Abbrechen</button>
-                  <button type="submit" style={styles.saveButton}>Speichern</button>
+                  <button type="button" onClick={() => setShowModal(false)} style={styles.cancelButton}>Cancel</button>
+                  <button type="submit" style={styles.saveButton}>Save</button>
                 </div>
               </form>
             </div>
@@ -257,39 +253,39 @@ export default function ProfilePage() {
   }
 
   // =========================================================
-  // RENDER: USER (Mein Profil)
+  // RENDER: USER VIEW (My Profile)
   // =========================================================
   return (
     <div style={styles.container}>
-      <h2>Mein Profil bearbeiten</h2>
+      <h2>Edit My Profile</h2>
       <div style={styles.headerRow}>
-         <span style={styles.badge}>Angemeldet als: {currentUser.username}</span>
+         <span style={styles.badge}>Logged in as: {currentUser.username}</span>
          <span style={{...styles.badge, marginLeft: '10px'}}>{currentUser.role}</span>
       </div>
       
       <div style={styles.form}>
         <div style={styles.row}>
           <div style={{...styles.formGroup, flex: 1}}>
-             <label style={styles.label}>Vorname</label>
+             <label style={styles.label}>Firstname</label>
              <input style={styles.input} value={myProfileForm.firstname} onChange={e => setMyProfileForm({...myProfileForm, firstname: e.target.value})} />
           </div>
           <div style={{...styles.formGroup, flex: 1}}>
-             <label style={styles.label}>Nachname</label>
+             <label style={styles.label}>Lastname</label>
              <input style={styles.input} value={myProfileForm.lastname} onChange={e => setMyProfileForm({...myProfileForm, lastname: e.target.value})} />
           </div>
         </div>
         
         <div style={styles.formGroup}>
-           <label style={styles.label}>E-Mail</label>
+           <label style={styles.label}>Email Address</label>
            <input style={styles.input} value={myProfileForm.email} onChange={e => setMyProfileForm({...myProfileForm, email: e.target.value})} />
         </div>
 
         <div style={styles.formGroup}>
-           <label style={styles.label}>Neues Passwort (optional)</label>
-           <input type="password" style={styles.input} value={myProfileForm.password} onChange={e => setMyProfileForm({...myProfileForm, password: e.target.value})} placeholder="Leer lassen um zu behalten" />
+           <label style={styles.label}>Set new password (optional)</label>
+           <input type="password" style={styles.input} value={myProfileForm.password} onChange={e => setMyProfileForm({...myProfileForm, password: e.target.value})} placeholder="Leave blank to keep current password" />
         </div>
 
-        <button onClick={handleMyProfileUpdate} style={styles.saveButton}>Änderungen speichern</button>
+        <button onClick={handleMyProfileUpdate} style={styles.saveButton}>Save Changes</button>
       </div>
     </div>
   );
