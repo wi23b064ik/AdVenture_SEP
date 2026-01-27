@@ -1,166 +1,225 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 
-// Typen definieren
+// === INTERFACES ===
 interface Bid {
   id: string;
   advertiserName: string;
   bidAmountCPM: number;
   submitTime: string;
   status: string;
+  impressions?: number;
+  clicks?: number;
 }
 
+// UPDATE: Interface erweitert um Details
 interface AuctionDetail {
   id: string;
   adSpaceName: string;
-  adSpaceId: string;
-  publisherId: string;
+  adSpaceId: number;
+  publisherName: string;
   startTime: string;
   endTime: string;
-  status: 'open' | 'closed';
+  status: string;
   minimumBidFloor: number;
-  mediaUrl?: string; // <--- NEU: Das Bild
-  totalBids: number;
+  mediaUrl?: string;
+  
+  // NEUE FELDER
+  width: number;
+  height: number;
+  category?: string;
+  description?: string;
+
   allBids: Bid[];
 }
 
-export default function AuctionDetails() {
-  const { id } = useParams<{ id: string }>(); 
+export default function AuctionPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
-  
   const [auction, setAuction] = useState<AuctionDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchDetails = async () => {
+    const fetchAuction = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/auctions/${id}`);
-        if (!response.ok) throw new Error('Auktion nicht gefunden');
-        const data = await response.json();
+        const res = await fetch(`http://localhost:3001/api/auctions/${id}`);
+        if (!res.ok) throw new Error("Auction not found");
+        const data = await res.json();
         setAuction(data);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Fehler beim Laden';
+        const msg = err instanceof Error ? err.message : "Error loading auction";
         setError(msg);
       } finally {
         setLoading(false);
       }
     };
-
-    if (id) fetchDetails();
+    fetchAuction();
+    
+    const interval = setInterval(fetchAuction, 3000);
+    return () => clearInterval(interval);
   }, [id]);
 
-  if (loading) return <div style={{padding: '2rem'}}>Lade Details...</div>;
-  if (error) return <div style={{padding: '2rem', color: 'red'}}>Fehler: {error}</div>;
-  if (!auction) return <div style={{padding: '2rem'}}>Keine Daten gefunden.</div>;
+  if (loading) return <div style={styles.container}>Loading...</div>;
+  if (error || !auction) return <div style={styles.container}>Error: {error}</div>;
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString("en-US", { 
+      year: 'numeric', month: 'short', day: 'numeric', 
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  };
 
   return (
     <div style={styles.container}>
-      <button onClick={() => navigate(-1)} style={styles.backButton}>← Zurück</button>
-      
+      {/* Back Button */}
+      <button onClick={() => navigate("/bidding")} style={styles.backButton}>
+        ← Back to Overview
+      </button>
+
+      {/* Header */}
       <div style={styles.header}>
-        <h1>{auction.adSpaceName} <span style={styles.idTag}>#{auction.id}</span></h1>
-        <div style={{
-          ...styles.statusBadge, 
-          backgroundColor: auction.status === 'open' ? '#d1fae5' : '#f3f4f6',
-          color: auction.status === 'open' ? '#065f46' : '#374151'
+        <h1 style={{margin: 0}}>
+          {auction.adSpaceName} <span style={styles.idBadge}>#{auction.id}</span>
+        </h1>
+        <span style={{
+            ...styles.statusBadge, 
+            backgroundColor: auction.status === 'open' ? '#d1fae5' : '#e5e7eb',
+            color: auction.status === 'open' ? '#065f46' : '#374151'
         }}>
-          {auction.status.toUpperCase()}
-        </div>
+            {auction.status.toUpperCase()}
+        </span>
       </div>
 
       <div style={styles.grid}>
-        {/* Linke Seite: Bild & Infos */}
+        {/* LEFT COLUMN: DETAILS */}
         <div style={styles.card}>
-          
-          {/* --- NEU: Bild Anzeige --- */}
-          {auction.mediaUrl ? (
+            {/* Image */}
             <div style={styles.imageContainer}>
-              <img 
-                src={`http://localhost:3001${auction.mediaUrl}`} 
-                alt={auction.adSpaceName} 
-                style={styles.image} 
-              />
+                {auction.mediaUrl ? (
+                    <img src={`http://localhost:3001${auction.mediaUrl}`} alt="Ad Space" style={styles.image} />
+                ) : (
+                    <div style={styles.placeholder}>No Image Available</div>
+                )}
             </div>
-          ) : (
-            <div style={styles.placeholderImage}>Kein Bild verfügbar</div>
-          )}
 
-          <h3>Details</h3>
-          <p><strong>Startzeit:</strong> {new Date(auction.startTime).toLocaleString()}</p>
-          <p><strong>Endzeit:</strong> {new Date(auction.endTime).toLocaleString()}</p>
-          <p><strong>Mindestgebot:</strong> €{Number(auction.minimumBidFloor).toFixed(2)}</p>
-          <p><strong>Ad Space ID:</strong> {auction.adSpaceId}</p>
+            <div style={styles.detailsContent}>
+                <h3>Ad Space Details</h3>
+                
+                {/* --- NEUE DETAILS: SIZE & CATEGORY --- */}
+                <div style={styles.detailRow}>
+                    <strong>Format (Size):</strong>
+                    <span style={{fontFamily: 'monospace', fontSize: '1.1rem'}}>
+                        {auction.width} x {auction.height} px
+                    </span>
+                </div>
+                <div style={styles.detailRow}>
+                    <strong>Category:</strong>
+                    <span style={styles.tag}>{auction.category || 'General'}</span>
+                </div>
+                {/* -------------------------------------- */}
+
+                <hr style={styles.divider} />
+
+                <div style={styles.detailRow}>
+                    <strong>Publisher:</strong>
+                    <span>{auction.publisherName}</span>
+                </div>
+                <div style={styles.detailRow}>
+                    <strong>Ad Space ID:</strong>
+                    <span>#{auction.adSpaceId}</span>
+                </div>
+
+                <hr style={styles.divider} />
+
+                <div style={styles.detailRow}>
+                    <strong>Start Time:</strong>
+                    <span>{formatDate(auction.startTime)}</span>
+                </div>
+                <div style={styles.detailRow}>
+                    <strong>End Time:</strong>
+                    <span>{formatDate(auction.endTime)}</span>
+                </div>
+                <div style={styles.detailRow}>
+                    <strong>Floor Price:</strong>
+                    <span style={{color: '#dc2626', fontWeight: 'bold'}}>€{Number(auction.minimumBidFloor).toFixed(2)} CPM</span>
+                </div>
+
+                {/* --- NEU: DESCRIPTION --- */}
+                {auction.description && (
+                    <div style={{marginTop: '20px'}}>
+                        <strong>Description:</strong>
+                        <p style={{color: '#666', fontSize: '0.9rem', lineHeight: '1.5', marginTop: '5px'}}>
+                            {auction.description}
+                        </p>
+                    </div>
+                )}
+            </div>
         </div>
 
-        {/* Rechte Seite: Gebots-Verlauf */}
+        {/* RIGHT COLUMN: BID HISTORY */}
         <div style={styles.card}>
-          <h3>Gebotsverlauf ({auction.totalBids})</h3>
-          {auction.allBids.length === 0 ? (
-            <p>Noch keine Gebote.</p>
-          ) : (
-            <ul style={styles.bidList}>
-              {auction.allBids.map((bid, index) => (
-                <li key={bid.id} style={styles.bidItem}>
-                  <div style={styles.bidInfo}>
-                    <span style={styles.rank}>#{index + 1}</span>
-                    <span>{bid.advertiserName || 'Unbekannt'}</span>
-                  </div>
-                  <div style={styles.bidValue}>
-                    €{Number(bid.bidAmountCPM).toFixed(2)}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+            <h3>Bid History ({auction.allBids.length})</h3>
+            
+            {auction.allBids.length === 0 ? (
+                <p style={{color: '#888', fontStyle: 'italic', padding: '20px'}}>No bids placed yet.</p>
+            ) : (
+                <div style={styles.bidList}>
+                    {auction.allBids.map((bid, index) => (
+                        <div key={bid.id} style={{
+                            ...styles.bidRow,
+                            backgroundColor: index === 0 ? '#f0fdf4' : 'transparent',
+                            borderLeft: index === 0 ? '4px solid #22c55e' : 'none'
+                        }}>
+                            <div style={{display: 'flex', flexDirection: 'column'}}>
+                                <span style={{fontWeight: 'bold'}}>
+                                    #{index + 1} {bid.advertiserName}
+                                </span>
+                                <span style={{fontSize: '0.8rem', color: '#666'}}>
+                                    {formatDate(bid.submitTime)}
+                                </span>
+                                {/* STATS ANZEIGE */}
+                                <div style={{fontSize: '0.75rem', marginTop: '4px', color: '#4b5563', background: '#f3f4f6', padding: '2px 6px', borderRadius: '4px', width: 'fit-content'}}>
+                                    👁️ {bid.impressions || 0} &nbsp; 👆 {bid.clicks || 0}
+                                </div>
+                            </div>
+                            <div style={{textAlign: 'right'}}>
+                                <div style={styles.bidAmount}>€{Number(bid.bidAmountCPM).toFixed(2)}</div>
+                                {index === 0 && <span style={styles.winnerLabel}>Highest</span>}
+                                <div style={{fontSize:'0.7rem', color: '#999'}}>{bid.status.toUpperCase()}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
       </div>
     </div>
   );
 }
 
-// Styles mit Bild-Styling
+// Styles
 const styles: { [key: string]: React.CSSProperties } = {
-  container: { maxWidth: '1000px', margin: '0 auto', padding: '2rem', fontFamily: 'Arial, sans-serif' },
-  backButton: { marginBottom: '1rem', padding: '0.5rem 1rem', cursor: 'pointer', border: 'none', background: '#e5e7eb', borderRadius: '4px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid #e5e7eb', paddingBottom: '1rem' },
-  idTag: { fontSize: '1rem', color: '#6b7280', fontWeight: 'normal' },
-  statusBadge: { padding: '0.5rem 1rem', borderRadius: '99px', fontWeight: 'bold', fontSize: '0.875rem' },
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' },
-  card: { background: 'white', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e5e7eb' },
-  bidList: { listStyle: 'none', padding: 0, margin: 0 },
-  bidItem: { display: 'flex', justifyContent: 'space-between', padding: '0.75rem 0', borderBottom: '1px solid #f3f4f6' },
-  bidInfo: { display: 'flex', gap: '10px' },
-  rank: { color: '#9ca3af', fontWeight: 'bold' },
-  bidValue: { fontWeight: 'bold', color: '#2563eb' },
+  container: { maxWidth: "1100px", margin: "0 auto", padding: "40px 20px", fontFamily: "'Inter', sans-serif, Arial", color: '#1f2937' },
+  backButton: { background: 'white', border: '1px solid #d1d5db', padding: '8px 16px', borderRadius: '6px', cursor: 'pointer', marginBottom: '20px', fontWeight: '600', color: '#4b5563', transition: 'background 0.2s' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #e5e7eb', paddingBottom: '20px' },
+  idBadge: { fontSize: '1.2rem', color: '#94a3b8', fontWeight: 'normal', marginLeft: '10px' },
+  statusBadge: { padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.9rem', letterSpacing: '0.5px' },
   
-  // NEU: Styles für das Bild
-  imageContainer: {
-    width: '100%',
-    height: '200px',
-    backgroundColor: '#f3f4f6',
-    borderRadius: '6px',
-    marginBottom: '1.5rem',
-    overflow: 'hidden',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover' // Sorgt dafür, dass das Bild den Bereich füllt ohne verzerrt zu werden
-  },
-  placeholderImage: {
-    width: '100%',
-    height: '200px',
-    backgroundColor: '#f3f4f6',
-    borderRadius: '6px',
-    marginBottom: '1.5rem',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    color: '#9ca3af',
-    fontStyle: 'italic'
-  }
+  grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px', alignItems: 'start' },
+  card: { backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' },
+  
+  imageContainer: { width: '100%', height: '300px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  image: { width: '100%', height: '100%', objectFit: 'contain' },
+  placeholder: { color: '#cbd5e1', fontWeight: 'bold', fontSize: '1.2rem' },
+  
+  detailsContent: { padding: '25px' },
+  detailRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px dashed #f1f5f9' },
+  divider: { border: '0', borderTop: '1px solid #e5e7eb', margin: '20px 0' },
+  tag: { backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '2px 10px', borderRadius: '12px', fontSize: '0.85rem', fontWeight: '600' },
+  
+  bidList: { padding: '0' },
+  bidRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: '1px solid #f1f5f9' },
+  bidAmount: { fontWeight: '800', color: '#2563eb', fontSize: '1.2rem' },
+  winnerLabel: { fontSize: '0.7rem', color: '#16a34a', fontWeight: 'bold', textTransform: 'uppercase', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }
 };
