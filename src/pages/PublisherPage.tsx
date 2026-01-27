@@ -12,9 +12,10 @@ interface AdInventory {
   description?: string;
   website_url?: string;
   media_url?: string;
+  publisher_id?: number; // Hilfreich für Admin zu sehen, wem es gehört
 }
 
-// Angepasst an die Antwort vom neuen Backend-Endpunkt
+// Angepasst an die Antwort vom Backend
 interface WinningBid {
   id: number;
   bid_amount: number;
@@ -25,14 +26,33 @@ interface WinningBid {
   advertiser_name: string;
   ad_space_name: string;
   created_at: string;
+  publisher_id?: string; // Neu für Filterung
+}
+
+// Hilfs-Interface für die Struktur der API-Antwort von /api/auctions
+interface AuctionAPIResponse {
+  id: number;
+  adSpaceName: string;
+  winningBid?: {
+    id: number;
+    bidAmountCPM: number;
+    status: string;
+    creative_url?: string;
+    creative_status?: 'pending_upload' | 'pending_review' | 'approved' | 'rejected';
+    campaignName: string;
+    advertiserName: string;
+    submitTime: string;
+  };
 }
 
 export default function PublisherPage() {
   const userString = localStorage.getItem('user');
   const user = userString ? JSON.parse(userString) : null;
+  
+  // === NEU: Admin Check ===
+  const isAdmin = user?.role === 'Admin';
 
   const [adSpaces, setAdSpaces] = useState<AdInventory[]>([]);
-  // Wir nutzen jetzt WinningBid statt Auction für das Dashboard
   const [winningBids, setWinningBids] = useState<WinningBid[]>([]);
   
   const [formData, setFormData] = useState({
@@ -49,29 +69,65 @@ export default function PublisherPage() {
 
   // === 1. DATEN LADEN ===
   useEffect(() => {
-    if (user && user.role === 'Publisher') {
-      fetchMyAdSpaces();
-      fetchWinningBids();
+    if (user && (user.role === 'Publisher' || isAdmin)) {
+      fetchAdSpaces();
+      fetchDashboardData();
     }
-    // WICHTIG: Nur user.id als Dependency, um Endlosschleifen zu verhindern!
-  }, [user?.id]);
+  }, [user?.id, isAdmin]);
 
-  const fetchMyAdSpaces = async () => {
+  const fetchAdSpaces = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/ad-spaces/publisher/${user.id}`);
+      // WENN ADMIN: Lade ALLE Ad Spaces. WENN PUBLISHER: Nur eigene.
+      const url = isAdmin 
+        ? `http://localhost:3001/api/ad-spaces` 
+        : `http://localhost:3001/api/ad-spaces/publisher/${user.id}`;
+
+      const res = await fetch(url);
       const data = await res.json();
       setAdSpaces(Array.isArray(data) ? data : []);
     } catch (err) { console.error("Loading error:", err); }
   };
 
-  // KORRIGIERT: Ruft jetzt den spezifischen Publisher-Endpunkt auf
-  const fetchWinningBids = async () => {
+const fetchDashboardData = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/publisher/${user.id}/winning-bids`);
-      if (!res.ok) throw new Error("Failed to load bids");
-      
-      const data = await res.json();
-      setWinningBids(Array.isArray(data) ? data : []);
+      if (isAdmin) {
+        // ADMIN LOGIK: Nutze die existierende Auctions Route und filtere client-seitig
+        const res = await fetch(`http://localhost:3001/api/auctions`);
+        
+        // HIER IST DER FIX: Wir sagen TS, dass das Ergebnis ein Array von AuctionAPIResponse ist
+        const auctions = (await res.json()) as AuctionAPIResponse[];
+        
+        // Wir extrahieren die Winning Bids aus allen Auktionen
+        const allWinners: WinningBid[] = auctions
+          .filter((a) => a.winningBid && a.winningBid.status === 'won') // 'a' ist jetzt typisiert
+          .map((a) => {
+             // Da wir oben gefiltert haben, wissen wir, dass winningBid existiert.
+             // TypeScript könnte trotzdem meckern, daher das "!" oder eine Prüfung.
+             const win = a.winningBid!; 
+             
+             return {
+               id: win.id,
+               bid_amount: win.bidAmountCPM,
+               status: win.status,
+               creative_url: win.creative_url,
+               // Fallback, falls status null ist
+               creative_status: win.creative_status || 'pending_upload', 
+               campaign_name: win.campaignName,
+               advertiser_name: win.advertiserName,
+               ad_space_name: a.adSpaceName,
+               created_at: win.submitTime
+            };
+          });
+          
+        setWinningBids(allWinners);
+
+      } else {
+        // PUBLISHER LOGIK (Bleibt wie vorher)
+        const res = await fetch(`http://localhost:3001/api/publisher/${user.id}/winning-bids`);
+        if (!res.ok) throw new Error("Failed to load bids");
+        const data = await res.json();
+        setWinningBids(Array.isArray(data) ? data : []);
+      }
     } catch (err) { console.error(err); }
   };
 
@@ -81,7 +137,7 @@ export default function PublisherPage() {
 
     try {
       const data = new FormData();
-      data.append('publisherId', user.id);
+      data.append('publisherId', user.id); // Auch Admin erstellt es auf seinen Namen (oder man baut ein Select ein)
       data.append('name', formData.name);
       data.append('width', formData.width.toString());
       data.append('height', formData.height.toString());
@@ -106,14 +162,14 @@ export default function PublisherPage() {
           minimumBidFloor: 0.5, description: "", websiteUrl: ""
         });
         setSelectedFile(null);
-        fetchMyAdSpaces();
+        fetchAdSpaces(); // Liste neu laden
       } else {
         alert("Error saving ad space");
       }
     } catch (err) { console.error(err); }
   };
 
-  // === 3. CREATIVE REVIEW (APPROVE / REJECT) ===
+  // === 3. CREATIVE REVIEW ===
   const handleDecision = async (bidId: number, decision: 'approved' | 'rejected') => {
     try {
       const res = await fetch(`http://localhost:3001/api/bids/${bidId}/status`, {
@@ -123,9 +179,8 @@ export default function PublisherPage() {
       });
 
       if (res.ok) {
-        // Optimistisches Update im UI oder neu laden
         alert(`Creative ${decision} successfully!`);
-        fetchWinningBids(); 
+        fetchDashboardData(); 
       } else {
         alert("Error updating status");
       }
@@ -146,27 +201,31 @@ export default function PublisherPage() {
     }
   };
 
-  // Helper für Badge Farben
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'approved': return { bg: '#dcfce7', text: '#166534', border: '#86efac' }; // Grün
-      case 'rejected': return { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' }; // Rot
-      case 'pending_review': return { bg: '#ffedd5', text: '#9a3412', border: '#fdba74' }; // Orange
-      case 'pending_upload': return { bg: '#f3f4f6', text: '#4b5563', border: '#d1d5db' }; // Grau
+      case 'approved': return { bg: '#dcfce7', text: '#166534', border: '#86efac' };
+      case 'rejected': return { bg: '#fee2e2', text: '#991b1b', border: '#fca5a5' };
+      case 'pending_review': return { bg: '#ffedd5', text: '#9a3412', border: '#fdba74' };
       default: return { bg: '#f3f4f6', text: '#4b5563', border: '#d1d5db' };
     }
   };
 
-  if (!user || user.role !== 'Publisher') return <div style={{padding:'2rem'}}>Access denied. Publishers only.</div>;
+  // === ZUGRIFFSPRÜFUNG ===
+  // Erlaubt jetzt Publisher ODER Admin
+  if (!user || (user.role !== 'Publisher' && !isAdmin)) {
+      return <div style={{padding:'40px', textAlign:'center'}}>⛔ Access denied. Publishers or Admins only.</div>;
+  }
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
-            <h2 style={{margin: 0, color: '#1e293b'}}>Publisher Portal</h2>
-            <p style={{margin: '5px 0 0', color: '#64748b'}}>Welcome back, {user.username}</p>
+            <h2 style={{margin: 0, color: '#1e293b'}}>{isAdmin ? "Admin Publisher View" : "Publisher Portal"}</h2>
+            <p style={{margin: '5px 0 0', color: '#64748b'}}>Logged in as {user.username}</p>
         </div>
-        <span style={styles.roleBadge}>Publisher Account</span>
+        <span style={isAdmin ? styles.adminBadge : styles.roleBadge}>
+            {isAdmin ? "Admin Mode" : "Publisher Account"}
+        </span>
       </div>
       
       {/* --- CREATE NEW AD SPACE --- */}
@@ -195,7 +254,6 @@ export default function PublisherPage() {
           <div style={{ ...styles.formGroup, gridColumn: "1 / -1" }}>
             <label style={styles.label}>Upload preview image (optional)</label>
             <input type="file" accept="image/*" onChange={handleFileChange} style={styles.input} />
-            <p style={{fontSize:'0.75rem', color:'#888', margin:'4px 0'}}>Ideally a screenshot of where the ad will appear.</p>
           </div>
 
           <div style={styles.formGroup}>
@@ -223,12 +281,12 @@ export default function PublisherPage() {
       {/* --- CREATIVE REVIEW DASHBOARD --- */}
       <div style={styles.reviewSection}>
         <div style={{marginBottom: '20px'}}>
-            <h3 style={{margin: 0}}>Creative Review Dashboard</h3>
+            <h3 style={{margin: 0}}>{isAdmin ? "Global Creative Review (All Users)" : "Creative Review Dashboard"}</h3>
             <p style={{color: '#666', margin: '5px 0'}}>Manage ads from winning advertisers.</p>
         </div>
         
         {winningBids.length === 0 ? (
-            <div style={styles.emptyState}>No winning bids yet.</div>
+            <div style={styles.emptyState}>No winning bids pending review.</div>
         ) : (
             <div style={styles.reviewGrid}>
                 {winningBids.map(bid => {
@@ -237,18 +295,12 @@ export default function PublisherPage() {
 
                     return (
                         <div key={bid.id} style={styles.reviewCard}>
-                            {/* Card Header with Status Badge */}
                             <div style={styles.reviewHeader}>
                                 <div style={{flex: 1, paddingRight: '10px'}}>
                                   <strong style={{fontSize: '1.05rem', display:'block', color: '#1e293b'}}>{bid.ad_space_name}</strong>
                                   <span style={{fontSize: '0.75rem', color: '#94a3b8'}}>Campaign: {bid.campaign_name}</span>
                                 </div>
-                                <span style={{
-                                  ...styles.statusBadge, 
-                                  backgroundColor: statusStyle.bg, 
-                                  color: statusStyle.text, 
-                                  border: `1px solid ${statusStyle.border}`
-                                }}>
+                                <span style={{...styles.statusBadge, backgroundColor: statusStyle.bg, color: statusStyle.text, border: `1px solid ${statusStyle.border}`}}>
                                   {status.replace('_', ' ').toUpperCase()}
                                 </span>
                             </div>
@@ -265,7 +317,6 @@ export default function PublisherPage() {
                                 
                                 <hr style={styles.divider} />
 
-                                {/* LOGIK FÜR DAS FOTO & BUTTONS */}
                                 {status === 'pending_review' && bid.creative_url ? (
                                     <div style={styles.actionBox}>
                                             <p style={{margin:'0 0 10px 0', fontSize: '0.85rem', fontWeight: 'bold', color:'#9a3412'}}>📷 Review Creative:</p>
@@ -289,12 +340,10 @@ export default function PublisherPage() {
                                 ) : status === 'pending_upload' ? (
                                     <div style={styles.pendingBox}>
                                         <div style={{fontSize:'1.5rem', marginBottom:'5px'}}>⏳</div>
-                                        <div>Waiting for Advertiser<br/>to upload creative...</div>
+                                        <div>Waiting for Advertiser upload...</div>
                                     </div>
                                 ) : (
-                                    <div style={styles.rejectedBox}>
-                                        ❌ Creative rejected.
-                                    </div>
+                                    <div style={styles.rejectedBox}>❌ Creative rejected.</div>
                                 )}
                             </div>
                         </div>
@@ -304,9 +353,9 @@ export default function PublisherPage() {
         )}
       </div>
 
-      {/* --- MY AD SPACES LIST --- */}
+      {/* --- AD SPACES LIST --- */}
       <div style={styles.listSection}>
-        <h3 style={{color: '#475569'}}>Your Ad Inventory ({adSpaces.length})</h3>
+        <h3 style={{color: '#475569'}}>{isAdmin ? "All Ad Spaces (Global)" : `Your Ad Inventory (${adSpaces.length})`}</h3>
         <div style={styles.grid}>
           {adSpaces.map((space) => (
             <div key={space.id} style={styles.card}>
@@ -317,7 +366,7 @@ export default function PublisherPage() {
               
               {space.media_url ? (
                 <div style={styles.mediaContainer}>
-                  {space.media_url.endsWith('.mp4') || space.media_url.endsWith('.webm') ? (
+                  {space.media_url.endsWith('.mp4') ? (
                     <video src={`http://localhost:3001${space.media_url}`} controls style={styles.media} />
                   ) : (
                     <img src={`http://localhost:3001${space.media_url}`} alt="Preview" style={styles.media} />
@@ -330,7 +379,7 @@ export default function PublisherPage() {
               <div style={{paddingTop: '10px'}}>
                 <p style={styles.cardText}><strong>URL:</strong> <a href={space.website_url} target="_blank" rel="noreferrer" style={{color: '#2563eb'}}>{space.website_url}</a></p>
                 <p style={styles.cardText}>Size: {space.width}x{space.height} | Floor: €{space.min_bid}</p>
-                <p style={{fontSize:'0.85rem', color:'#94a3b8', marginTop:'8px', fontStyle:'italic'}}>{space.description || "No description provided."}</p>
+                {isAdmin && space.publisher_id && <p style={{fontSize:'0.75rem', color: 'red'}}>Publisher ID: {space.publisher_id}</p>}
               </div>
             </div>
           ))}
@@ -345,6 +394,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   container: { padding: "40px 20px", maxWidth: "1100px", margin: "0 auto", fontFamily: "'Inter', sans-serif, Arial", color: '#334155' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', borderBottom: '1px solid #e2e8f0', paddingBottom: '20px' },
   roleBadge: { backgroundColor: '#fff7ed', color: '#c2410c', padding: '6px 12px', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.85rem', border: '1px solid #ffedd5' },
+  adminBadge: { backgroundColor: "#fee2e2", color: "#991b1b", padding: "6px 12px", borderRadius: "20px", fontSize: "0.85rem", fontWeight: "bold", border: '1px solid #fecaca' },
   
   // Form Styles
   formSection: { backgroundColor: "#ffffff", padding: "30px", borderRadius: "16px", marginBottom: "50px", border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05)" },
@@ -354,7 +404,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   input: { padding: "10px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "0.95rem", transition: "border 0.2s" },
   button: { backgroundColor: "#2563eb", color: "white", padding: "12px 24px", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "1rem", boxShadow: "0 2px 4px rgba(37,99,235,0.2)" },
   
-  // Review Styles (Improved)
+  // Review Styles
   reviewSection: { marginBottom: "60px" },
   reviewGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '25px' },
   reviewCard: { border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#fff', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
@@ -364,12 +414,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   infoRow: { display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.9rem', color: '#334155' },
   divider: { margin: '15px 0', border: '0', borderTop: '1px solid #f1f5f9' },
   
-  // Action Boxes
   actionBox: { backgroundColor: '#fff7ed', border: '1px solid #fed7aa', padding: '15px', borderRadius: '8px', marginTop: 'auto' },
   imagePreviewWrapper: { backgroundColor: '#fff', padding: '5px', border: '1px solid #e2e8f0', borderRadius: '4px', display:'flex', justifyContent:'center', minHeight: '100px' },
   previewImage: { maxWidth: '100%', maxHeight: '150px', objectFit: 'contain' },
   btnRow: { display: 'flex', gap: '10px', marginTop: '15px' },
-  actionBtn: { flex: 1, padding: '8px', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem', transition: 'opacity 0.2s' },
+  actionBtn: { flex: 1, padding: '8px', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: '600', fontSize: '0.85rem' },
   
   successBox: { backgroundColor: '#f0fdf4', color: '#166534', padding: '20px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: '600', textAlign: 'center', border: '1px solid #bbf7d0', marginTop: 'auto' },
   pendingBox: { backgroundColor: '#f8fafc', color: '#64748b', padding: '20px', borderRadius: '8px', fontSize: '0.9rem', fontStyle: 'italic', textAlign: 'center', border: '1px dashed #cbd5e1', marginTop: 'auto' },
@@ -381,7 +430,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   listSection: { marginTop: "30px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "25px" },
   card: { backgroundColor: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", transition: 'transform 0.2s' },
-  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" },
+  cardHeader: { display: "flex", justifyContent: "space-between", alignItems: 'center', marginBottom: "15px" },
   categoryBadge: { backgroundColor: "#f1f5f9", color: "#475569", padding: "4px 10px", borderRadius: "20px", fontSize: "0.75rem", fontWeight: "bold" },
   cardText: { fontSize: "0.9rem", margin: "6px 0", color: "#334155" },
   
