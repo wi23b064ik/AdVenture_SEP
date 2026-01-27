@@ -478,16 +478,26 @@ app.get('/api/auctions', async (req: Request, res: Response) => {
         // --- WIN LOGIC: CHECK EXPIRED AUCTIONS ---
         if (endTime < now && status === 'open') {
           status = 'closed';
+          // 1. Auktion schließen
           await connection!.execute('UPDATE auctions SET status = ? WHERE id = ?', ['closed', auction.id]);
           
           if (bids.length > 0) {
              const winner = bids[0]; // Highest bid
-             // Set winner to 'won'
+             
+             // 2. Status Updates für Bids
              await connection!.execute('UPDATE bids SET status = ? WHERE id = ?', ['won', winner.id]);
-             // Set others to 'lost'
              await connection!.execute('UPDATE bids SET status = ? WHERE auction_id = ? AND id != ?', ['lost', auction.id, winner.id]);
-             // Update auction table
+             
+             // 3. Update auction table
              await connection!.execute('UPDATE auctions SET winning_bid_id = ? WHERE id = ?', [winner.id, auction.id]);
+
+             // 4. NEU: Budget von der Kampagne abziehen!
+             const amountToDeduct = parseFloat(winner.bid_amount);
+             await connection!.execute(
+               'UPDATE campaigns SET total_budget = total_budget - ? WHERE id = ?', 
+               [amountToDeduct, winner.campaign_id]
+             );
+             console.log(`Auction ${auction.id} closed. Deducted €${amountToDeduct} from Campaign ${winner.campaign_id}`);
           }
         }
 
@@ -539,8 +549,6 @@ app.get('/api/auctions', async (req: Request, res: Response) => {
     if (connection) await connection.end();
   }
 });
-
-// In index.ts
 
 app.get('/api/auctions/:id', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
@@ -644,28 +652,38 @@ app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { campaign_id, advertiser_id, bid_amount } = req.body;
-    if (!campaign_id || !advertiser_id || !bid_amount) return res.status(400).json({ message: 'Campaign ID, Advertiser ID, and Bid Amount are required.' });
+    
+    if (!campaign_id || !advertiser_id || !bid_amount) return res.status(400).json({ message: 'Missing fields.' });
 
     connection = await mysql.createConnection(dbConfig);
-    const auctionQuery = 'SELECT status, minimum_bid_floor, end_time FROM auctions WHERE id = ?';
-    const [auctionRows] = await connection.execute<RowDataPacket[]>(auctionQuery, [id]);
 
+    // 1. AUKTION PRÜFEN
+    const [auctionRows] = await connection.execute<RowDataPacket[]>('SELECT status, minimum_bid_floor, end_time FROM auctions WHERE id = ?', [id]);
     if (auctionRows.length === 0) return res.status(404).json({ message: 'Auction not found.' });
     const auction = auctionRows[0];
 
-    if (auction.status === 'closed') return res.status(400).json({ message: 'Auction is already closed.' });
-
-    const endTime = new Date(auction.end_time);
-    if (endTime < new Date()) {
-      await connection.execute('UPDATE auctions SET status = ? WHERE id = ?', ['closed', id]);
-      return res.status(400).json({ message: 'Auction has expired.' });
+    if (auction.status === 'closed' || new Date(auction.end_time) < new Date()) {
+      return res.status(400).json({ message: 'Auction is closed.' });
+    }
+    if (bid_amount < auction.minimum_bid_floor) {
+      return res.status(400).json({ message: `Bid too low. Min: ${auction.minimum_bid_floor}` });
     }
 
-    if (bid_amount < auction.minimum_bid_floor) return res.status(400).json({ message: `Bid must be at least ${auction.minimum_bid_floor}.` });
+    // 2. KAMPAGNEN-BUDGET PRÜFEN (NEU!)
+    const [campaignRows] = await connection.execute<RowDataPacket[]>('SELECT total_budget, campaign_name FROM campaigns WHERE id = ?', [campaign_id]);
+    if (campaignRows.length === 0) return res.status(404).json({ message: 'Campaign not found.' });
+    
+    const campaign = campaignRows[0];
+    if (parseFloat(campaign.total_budget) < bid_amount) {
+       return res.status(400).json({ message: `Budget too low! Campaign only has €${campaign.total_budget} left.` });
+    }
 
+    // 3. GEBOT PLATZIEREN
     const bidQuery = `INSERT INTO bids (auction_id, campaign_id, advertiser_id, bid_amount, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())`;
     const [result] = await connection.execute<ResultSetHeader>(bidQuery, [id, campaign_id, advertiser_id, bid_amount]);
+    
     res.status(201).json({ message: 'Bid placed successfully.', bidId: result.insertId });
+
   } catch (error) { 
     console.error('Bid placement error:', error);
     res.status(500).json({ message: 'Error placing bid.' });
