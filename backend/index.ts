@@ -653,17 +653,21 @@ app.post('/api/auctions', async (req: Request, res: Response) => {
   }
 });
 
+// UPDATE: Bidding Endpoint mit Prüfung auf das höchste Gebot
 app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     const { id } = req.params;
     const { campaign_id, advertiser_id, bid_amount } = req.body;
     
-    if (!campaign_id || !advertiser_id || !bid_amount) return res.status(400).json({ message: 'Missing fields.' });
+    // Validierung der Eingaben
+    if (!campaign_id || !advertiser_id || !bid_amount) {
+        return res.status(400).json({ message: 'Missing fields.' });
+    }
 
     connection = await mysql.createConnection(dbConfig);
 
-    // 1. AUKTION PRÜFEN
+    // 1. AUKTION PRÜFEN (Existenz & Zeit)
     const [auctionRows] = await connection.execute<RowDataPacket[]>('SELECT status, minimum_bid_floor, end_time FROM auctions WHERE id = ?', [id]);
     if (auctionRows.length === 0) return res.status(404).json({ message: 'Auction not found.' });
     const auction = auctionRows[0];
@@ -671,12 +675,28 @@ app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
     if (auction.status === 'closed' || new Date(auction.end_time) < new Date()) {
       return res.status(400).json({ message: 'Auction is closed.' });
     }
-    if (bid_amount < auction.minimum_bid_floor) {
-      return res.status(400).json({ message: `Bid too low. Min: ${auction.minimum_bid_floor}` });
+
+    // 2. HÖCHSTGEBOT PRÜFEN (DAS IST NEU & WICHTIG!)
+    const [maxBidRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT MAX(bid_amount) as maxBid FROM bids WHERE auction_id = ?', 
+        [id]
+    );
+    
+    // Das aktuelle Höchstgebot holen (oder 0, falls noch keines existiert)
+    const currentHighestBid = maxBidRows[0].maxBid ? parseFloat(maxBidRows[0].maxBid) : 0;
+
+    // Szenario A: Es gibt schon Gebote -> Neues Gebot muss HÖHER sein als das aktuelle
+    if (currentHighestBid > 0 && bid_amount <= currentHighestBid) {
+        return res.status(400).json({ message: `Bid too low! Current highest is €${currentHighestBid.toFixed(2)}. You must bid higher.` });
     }
 
-    // 2. KAMPAGNEN-BUDGET PRÜFEN (NEU!)
-    const [campaignRows] = await connection.execute<RowDataPacket[]>('SELECT total_budget, campaign_name FROM campaigns WHERE id = ?', [campaign_id]);
+    // Szenario B: Noch keine Gebote -> Neues Gebot muss mindestens der Floor Price sein
+    if (bid_amount < auction.minimum_bid_floor) {
+      return res.status(400).json({ message: `Bid too low. Minimum floor price is €${auction.minimum_bid_floor}.` });
+    }
+
+    // 3. KAMPAGNEN-BUDGET PRÜFEN
+    const [campaignRows] = await connection.execute<RowDataPacket[]>('SELECT total_budget FROM campaigns WHERE id = ?', [campaign_id]);
     if (campaignRows.length === 0) return res.status(404).json({ message: 'Campaign not found.' });
     
     const campaign = campaignRows[0];
@@ -684,7 +704,7 @@ app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
        return res.status(400).json({ message: `Budget too low! Campaign only has €${campaign.total_budget} left.` });
     }
 
-    // 3. GEBOT PLATZIEREN
+    // 4. GEBOT PLATZIEREN (Alles OK)
     const bidQuery = `INSERT INTO bids (auction_id, campaign_id, advertiser_id, bid_amount, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())`;
     const [result] = await connection.execute<ResultSetHeader>(bidQuery, [id, campaign_id, advertiser_id, bid_amount]);
     

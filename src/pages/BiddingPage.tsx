@@ -331,7 +331,7 @@ export default function BiddingPage() {
   return (
     <div style={styles.container}>
       <h2>Real-Time Bidding Auctions (OpenRTB)</h2>
-      <p>Advertisers compete in real-time. Prices are CPM.</p>
+      <p>Advertisers compete in real-time.</p>
 
       {userRole === "Publisher" && (
         <div style={styles.publisherSection}>
@@ -343,7 +343,7 @@ export default function BiddingPage() {
             </select>
             
             <select value={auctionFormData.durationSeconds} onChange={(e) => setAuctionFormData({...auctionFormData, durationSeconds: e.target.value})} style={styles.select}>
-               <option value="60">1 Minute (Test)</option>
+               <option value="60">1 Minute</option>
                <option value="300">5 Minutes</option>
                <option value="1800">30 Minutes</option>
                <option value="3600">1 Hour</option>
