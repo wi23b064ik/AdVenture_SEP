@@ -40,13 +40,13 @@ interface AdSpace {
   category: string;
 }
 
-// Typ für die Dropdown-Liste der Kampagnen
+
 interface AdvertiserCampaign {
   id: number;
   campaign_name: string;
 }
 
-// Helper Interfaces for Raw Data
+
 interface RawBid {
   id: string;
   auctionId: string;
@@ -89,7 +89,7 @@ export default function BiddingPage() {
   
   // Daten für Dropdowns
   const [publisherAdSpaces, setPublisherAdSpaces] = useState<AdSpace[]>([]);
-  const [myCampaigns, setMyCampaigns] = useState<AdvertiserCampaign[]>([]); // NEU: Kampagnen des Advertisers
+  const [myCampaigns, setMyCampaigns] = useState<AdvertiserCampaign[]>([]); 
   
   const [auctionFormData, setAuctionFormData] = useState({ adSpaceId: "", durationSeconds: "3600" });
   
@@ -265,7 +265,7 @@ export default function BiddingPage() {
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
-          campaign_id: parseInt(bidData.campaignId), // ID kommt jetzt aus dem Select
+          campaign_id: parseInt(bidData.campaignId), 
           advertiser_id: user.id, 
           bid_amount: parseFloat(bidData.bidAmount),
         }),

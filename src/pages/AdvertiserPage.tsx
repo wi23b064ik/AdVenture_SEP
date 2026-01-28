@@ -79,8 +79,8 @@ export default function AdvertiserPage() {
       const data = await res.json();
       setBids(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error(err); // Fehler loggen
-      setBidError("Failed to load bids"); // Fix: Nicht auf err.message zugreifen, da err 'unknown' ist
+      console.error(err); 
+      setBidError("Failed to load bids"); 
     } finally {
       setLoadingBids(false);
     }
@@ -95,7 +95,7 @@ export default function AdvertiserPage() {
 
   const uploadCreative = async (bidId: number) => {
     const file = selectedFiles[bidId];
-    if (!file) { alert("Bitte wähle zuerst ein Foto aus."); return; }
+    if (!file) { alert("Please select a Photo."); return; }
 
     const formData = new FormData();
     formData.append('creative', file);
@@ -108,13 +108,13 @@ export default function AdvertiserPage() {
       });
 
       if (response.ok) {
-        alert("Foto hochgeladen! Warte auf Bestätigung des Publishers.");
+        alert("Wait for the acceptance of the Publisher.");
         fetchBids(); 
         const newFiles = { ...selectedFiles };
         delete newFiles[bidId];
         setSelectedFiles(newFiles);
       } else {
-        alert("Upload fehlgeschlagen.");
+        alert("Upload failed.");
       }
     } catch (err) { console.error(err); }
   };

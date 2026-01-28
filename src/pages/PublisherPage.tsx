@@ -12,10 +12,10 @@ interface AdInventory {
   description?: string;
   website_url?: string;
   media_url?: string;
-  publisher_id?: number; // Hilfreich für Admin zu sehen, wem es gehört
+  publisher_id?: number; 
 }
 
-// Angepasst an die Antwort vom Backend
+
 interface WinningBid {
   id: number;
   bid_amount: number;
@@ -26,10 +26,10 @@ interface WinningBid {
   advertiser_name: string;
   ad_space_name: string;
   created_at: string;
-  publisher_id?: string; // Neu für Filterung
+  publisher_id?: string; 
 }
 
-// Hilfs-Interface für die Struktur der API-Antwort von /api/auctions
+
 interface AuctionAPIResponse {
   id: number;
   adSpaceName: string;
@@ -49,7 +49,7 @@ export default function PublisherPage() {
   const userString = localStorage.getItem('user');
   const user = userString ? JSON.parse(userString) : null;
   
-  // === NEU: Admin Check ===
+  
   const isAdmin = user?.role === 'Admin';
 
   const [adSpaces, setAdSpaces] = useState<AdInventory[]>([]);
@@ -77,7 +77,7 @@ export default function PublisherPage() {
 
   const fetchAdSpaces = async () => {
     try {
-      // WENN ADMIN: Lade ALLE Ad Spaces. WENN PUBLISHER: Nur eigene.
+      
       const url = isAdmin 
         ? `http://localhost:3001/api/ad-spaces` 
         : `http://localhost:3001/api/ad-spaces/publisher/${user.id}`;
@@ -91,18 +91,17 @@ export default function PublisherPage() {
 const fetchDashboardData = async () => {
     try {
       if (isAdmin) {
-        // ADMIN LOGIK: Nutze die existierende Auctions Route und filtere client-seitig
+        
         const res = await fetch(`http://localhost:3001/api/auctions`);
         
-        // HIER IST DER FIX: Wir sagen TS, dass das Ergebnis ein Array von AuctionAPIResponse ist
+        
         const auctions = (await res.json()) as AuctionAPIResponse[];
         
-        // Wir extrahieren die Winning Bids aus allen Auktionen
+        
         const allWinners: WinningBid[] = auctions
-          .filter((a) => a.winningBid && a.winningBid.status === 'won') // 'a' ist jetzt typisiert
+          .filter((a) => a.winningBid && a.winningBid.status === 'won') 
           .map((a) => {
-             // Da wir oben gefiltert haben, wissen wir, dass winningBid existiert.
-             // TypeScript könnte trotzdem meckern, daher das "!" oder eine Prüfung.
+            
              const win = a.winningBid!; 
              
              return {
@@ -110,7 +109,7 @@ const fetchDashboardData = async () => {
                bid_amount: win.bidAmountCPM,
                status: win.status,
                creative_url: win.creative_url,
-               // Fallback, falls status null ist
+               
                creative_status: win.creative_status || 'pending_upload', 
                campaign_name: win.campaignName,
                advertiser_name: win.advertiserName,
@@ -122,7 +121,7 @@ const fetchDashboardData = async () => {
         setWinningBids(allWinners);
 
       } else {
-        // PUBLISHER LOGIK (Bleibt wie vorher)
+       
         const res = await fetch(`http://localhost:3001/api/publisher/${user.id}/winning-bids`);
         if (!res.ok) throw new Error("Failed to load bids");
         const data = await res.json();
@@ -137,7 +136,7 @@ const fetchDashboardData = async () => {
 
     try {
       const data = new FormData();
-      data.append('publisherId', user.id); // Auch Admin erstellt es auf seinen Namen (oder man baut ein Select ein)
+      data.append('publisherId', user.id); 
       data.append('name', formData.name);
       data.append('width', formData.width.toString());
       data.append('height', formData.height.toString());
@@ -162,7 +161,7 @@ const fetchDashboardData = async () => {
           minimumBidFloor: 0.5, description: "", websiteUrl: ""
         });
         setSelectedFile(null);
-        fetchAdSpaces(); // Liste neu laden
+        fetchAdSpaces(); 
       } else {
         alert("Error saving ad space");
       }
@@ -211,7 +210,6 @@ const fetchDashboardData = async () => {
   };
 
   // === ZUGRIFFSPRÜFUNG ===
-  // Erlaubt jetzt Publisher ODER Admin
   if (!user || (user.role !== 'Publisher' && !isAdmin)) {
       return <div style={{padding:'40px', textAlign:'center'}}>⛔ Access denied. Publishers or Admins only.</div>;
   }

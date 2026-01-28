@@ -5,7 +5,6 @@ export default function Login() {
   // State für die Eingabefelder
   const [identifier, setIdentifier] = useState(''); 
   const [password, setPassword] = useState('');
-  // NEU: State für Checkbox
   const [rememberMe, setRememberMe] = useState(false);
   
   const [loading, setLoading] = useState(false);
@@ -165,7 +164,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     borderRadius: '4px',
     fontSize: '1rem',
   },
-  // NEUE STYLES FÜR CHECKBOX
+  
   checkboxContainer: {
     display: 'flex',
     alignItems: 'center',

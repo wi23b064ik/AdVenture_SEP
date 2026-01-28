@@ -10,7 +10,7 @@ export default function Navbar() {
   // 2. Logout-Funktion
   const handleLogout = () => {
     localStorage.removeItem('user');
-    window.location.href = "/login"; // Seite neu laden
+    window.location.href = "/login"; 
   };
 
   return (
@@ -53,12 +53,12 @@ export default function Navbar() {
         {user && (
            <NavLink to="/profile" className={({ isActive }) => (isActive ? "active" : "")}>
              {/* WENN Admin -> "Profile verwalten", SONST -> "Profilverwaltung" */}
-             {role === 'Admin' ? 'Profile editing' : 'Profil management'}
+             {role === 'Admin' ? 'Profile verwalten' : 'Profilverwaltung'}
            </NavLink>
         )}
 
 
-        {/* =======================================================
+        {/* ===================================
             GÄSTE (Nicht eingeloggt)
            ======================================================= */}
         {!user && (
@@ -67,7 +67,7 @@ export default function Navbar() {
               Login
             </NavLink>
             <NavLink to="/register" className={({ isActive }) => (isActive ? "active" : "")}>
-              Registration
+              Registrieren
             </NavLink>
           </>
         )}

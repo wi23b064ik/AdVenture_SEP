@@ -9,7 +9,7 @@ import cookieParser from 'cookie-parser';
 
 const app = express();
 const port = 3001;
-const JWT_SECRET = 'super-secret-key'; // Sollte in Produktion in .env stehen
+const JWT_SECRET = 'super-secret-key'; 
 
 // === Configuration ===
 app.use(cors({
@@ -317,7 +317,7 @@ app.get('/api/ad-spaces/publisher/:publisherId', async (req: Request, res: Respo
   }
 });
 
-// FETCH BIDS FOR ADVERTISER (UPDATED: INCLUDES CREATIVE STATUS)
+// FETCH BIDS FOR ADVERTISER 
 app.get('/api/bids/:advertiserId', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
@@ -383,7 +383,6 @@ app.post('/api/bids/upload-creative', upload.single('creative'), async (req: Req
 });
 
 
-// --- FÜGE DIES IN DEINE INDEX.TS EIN ---
 
 // Holen aller gewonnenen Bids für einen bestimmten Publisher (für das Review Dashboard)
 app.get('/api/publisher/:publisherId/winning-bids', async (req: Request, res: Response) => {
@@ -423,7 +422,7 @@ app.post('/api/bids/:bidId/status', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     const { bidId } = req.params;
-    const { status } = req.body; // 'approved' or 'rejected'
+    const { status } = req.body; 
 
     if (!['approved', 'rejected'].includes(status)) {
         return res.status(400).json({ message: 'Invalid status' });
@@ -550,18 +549,24 @@ app.get('/api/auctions', async (req: Request, res: Response) => {
   }
 });
 
+
 app.get('/api/auctions/:id', async (req: Request, res: Response) => {
   let connection: mysql.Connection | undefined;
   try {
     const { id } = req.params;
     connection = await mysql.createConnection(dbConfig);
     
-    // 1. UPDATE THE SQL QUERY to select description and category explicitly
+    
     const auctionQuery = `
       SELECT 
         a.id, a.ad_space_id, a.start_time, a.end_time, a.status, a.minimum_bid_floor, 
-        ads.name as adSpaceName, ads.width, ads.height, ads.media_url as mediaUrl, 
-        ads.category, ads.description,  -- ADDED THESE
+        ads.name as adSpaceName, 
+        ads.width, 
+        ads.height, 
+        ads.category, 
+        ads.description, 
+        ads.website_url,  -- NEU: Website URL hinzugefügt
+        ads.media_url as mediaUrl, 
         u.id as publisherId, u.username as publisherName
       FROM auctions a 
       JOIN ad_spaces ads ON a.ad_space_id = ads.id 
@@ -580,24 +585,25 @@ app.get('/api/auctions/:id', async (req: Request, res: Response) => {
     `;
     const [bids] = await connection.execute<RowDataPacket[]>(bidsQuery, [id]);
 
-    // 2. INCLUDE NEW FIELDS IN RESPONSE
+    
     res.status(200).json({
       id: auction.id, 
       adSpaceName: auction.adSpaceName, 
       adSpaceId: auction.ad_space_id, 
       publisherId: auction.publisherId, 
-      publisherName: auction.publisherName, // Ensure this is sent
+      publisherName: auction.publisherName, 
       startTime: auction.start_time, 
       endTime: auction.end_time,
       status: auction.status, 
       minimumBidFloor: auction.minimum_bid_floor, 
       mediaUrl: auction.mediaUrl, 
       
-      // New Fields
+      
       width: auction.width,
       height: auction.height,
       category: auction.category,
       description: auction.description,
+      websiteUrl: auction.website_url, // NEU
 
       totalBids: bids.length,
       allBids: bids.map((bid: RowDataPacket) => ({

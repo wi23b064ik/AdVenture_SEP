@@ -90,9 +90,7 @@ input:focus {
   }
 }
 
-/* NAVBAR STYLING */
 
-/* Main navbar container */
 .navbar {
   background-color: #1e1e2f;
   display: flex;
@@ -105,7 +103,7 @@ input:focus {
   z-index: 100;
 }
 
-/* Logo section */
+
 .navbar-logo {
   color: #61dafb;
   font-size: 1.3rem;
@@ -113,13 +111,13 @@ input:focus {
   letter-spacing: 1px;
 }
 
-/* Links container */
+
 .navbar-links {
   display: flex;
   gap: 20px;
 }
 
-/* Individual links */
+
 .navbar-links a {
   color: #ffffff;
   text-decoration: none;
@@ -128,7 +126,7 @@ input:focus {
   transition: color 0.2s ease, border-bottom 0.2s ease;
 }
 
-/* Hover and active states */
+
 .navbar-links a:hover {
   color: #61dafb;
 }
@@ -139,7 +137,7 @@ input:focus {
   padding-bottom: 2px;
 }
 
-/* Optional: Responsive design */
+
 @media (max-width: 600px) {
   .navbar {
     flex-direction: column;
@@ -153,7 +151,7 @@ input:focus {
   }
 }
 
-/* Hover Effect */
+
 .navbar-links a {
   color: #ffffff;
   text-decoration: none;
@@ -178,16 +176,16 @@ input:focus {
 }
 
 .navbar-logo {
-  margin-right: 30px; /* Schafft Platz nach rechts */
+  margin-right: 30px; 
   font-weight: bold;
   font-size: 1.5rem;
-  color: #61dafb; /* Optional: Eine schöne Farbe für das Logo */
+  color: #61dafb; 
 }
 
 .navbar {
   display: flex;
-  align-items: center; /* Sorgt dafür, dass Logo und Text vertikal mittig sind */
+  align-items: center; 
   padding: 10px 20px;
-  background-color: #1f2937; /* Deine dunkle Farbe */
+  background-color: #1f2937; 
   color: white;
 }

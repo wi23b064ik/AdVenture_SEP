@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 export default function Register() {
   const navigate = useNavigate();
 
-  // State für alle Formularfelder
+  
   const [formData, setFormData] = useState({
     salutation: 'Herr',
     firstname: '',
@@ -20,7 +20,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Handler für Änderungen
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -155,10 +155,10 @@ const styles: { [key: string]: React.CSSProperties } = {
   subtitle: { textAlign: 'center', color: '#6b7280', marginBottom: '1.5rem' },
   form: { display: 'flex', flexDirection: 'column', gap: '1rem' },
   
-  // WICHTIG: Row sorgt dafür, dass Dinge nebeneinander stehen
+  
   row: { display: 'flex', gap: '1rem' }, 
   
-  // WICHTIG: InputGroup sorgt dafür, dass Label ÜBER dem Input steht
+ 
   inputGroup: { display: 'flex', flexDirection: 'column', flex: 1 },
   
   label: { fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem', color: '#374151' },
