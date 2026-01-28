@@ -63,7 +63,7 @@ export default function HomePage() {
               <li>Transparent pricing</li>
               <li>Instant results</li>
               <li>Fair outcomes</li>
-            </ul>
+            </ul>{/*  */}
           </div>
 
           <div className="role-card">
