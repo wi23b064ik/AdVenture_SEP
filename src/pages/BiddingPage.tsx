@@ -432,7 +432,7 @@ export default function BiddingPage() {
 
       <div style={styles.section}>
         <h3>✅ Completed Auctions ({closedAuctions.length})</h3>
-        <div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
           {closedAuctions.map((auction) => {
             const winner = auction.winningBid || (auction.allBids.length > 0 ? auction.allBids[0] : null);
             const isWinner = winner && localStorage.getItem('user') && JSON.parse(localStorage.getItem('user')!).id === winner.advertiserId;
