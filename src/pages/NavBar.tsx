@@ -67,7 +67,7 @@ export default function Navbar() {
               Login
             </NavLink>
             <NavLink to="/register" className={({ isActive }) => (isActive ? "active" : "")}>
-              Registrieren
+              Registration
             </NavLink>
           </>
         )}
