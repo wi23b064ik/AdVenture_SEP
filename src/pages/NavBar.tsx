@@ -53,7 +53,7 @@ export default function Navbar() {
         {user && (
            <NavLink to="/profile" className={({ isActive }) => (isActive ? "active" : "")}>
              {/* WENN Admin -> "Profile verwalten", SONST -> "Profilverwaltung" */}
-             {role === 'Admin' ? 'Profile verwalten' : 'Profilverwaltung'}
+             {role === 'Admin' ? 'Profile managing' : 'Profile Managemnt'}
            </NavLink>
         )}
 

@@ -704,7 +704,7 @@ app.post('/api/auctions/:id/bids', async (req: Request, res: Response) => {
        return res.status(400).json({ message: `Budget too low! Campaign only has €${campaign.total_budget} left.` });
     }
 
-    // 4. GEBOT PLATZIEREN (Alles OK)
+    // 4. GEBOT PLATZIEREN
     const bidQuery = `INSERT INTO bids (auction_id, campaign_id, advertiser_id, bid_amount, status, created_at) VALUES (?, ?, ?, ?, 'pending', NOW())`;
     const [result] = await connection.execute<ResultSetHeader>(bidQuery, [id, campaign_id, advertiser_id, bid_amount]);
     
