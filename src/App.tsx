@@ -11,9 +11,8 @@ import Navbar from "./pages/NavBar";
 import Login from "./pages/login"; 
 import Register from "./pages/register";
 import ProfilePage from "./pages/ProfilePage.tsx"; 
-
-// --- NEU: Import für die Detailseite ---
 import AuctionDetails from "./pages/AuctionDetails"; 
+import Impressum from "./pages/Impressum"; 
 
 function App() {
   return (
@@ -33,6 +32,9 @@ function App() {
         {/* --- NEU: Die Route für die Detailansicht --- */}
         {/* ":id" ist ein Platzhalter, der z.B. "123" fängt */}
         <Route path="/auction/:id" element={<AuctionDetails />} />
+        
+        {/* Impressum */}
+        <Route path="/impressum" element={<Impressum />} />
 
       </Routes>
     </Router>

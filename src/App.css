@@ -1,53 +1,539 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+body {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  overflow-x: hidden;
+}
+
 #root {
-  max-width: 1280px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* ==================== HOMEPAGE STYLES ==================== */
+.homepage {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Separator */
+.separator {
+  height: 1px;
+  background: #ddd;
+  margin: 0;
+  width: 100%;
+  display: block;
+}
+
+/* ==================== INTRODUCTION SECTION ==================== */
+.intro-section {
+  width: 100%;
+  padding: 80px 20px;
+  background-color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+}
+
+.intro-container {
+  width: 100%;
+  max-width: 900px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 60px 50px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(102, 126, 234, 0.2);
+}
+
+.intro-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin-bottom: 30px;
+  letter-spacing: -1px;
+  line-height: 1.1;
+}
+
+.intro-text {
+  font-size: 1.1rem;
+  line-height: 1.8;
+  margin-bottom: 35px;
+  font-weight: 300;
+  opacity: 0.95;
+}
+
+.intro-features {
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.intro-feature {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ==================== HOW IT WORKS SECTION ==================== */
+.how-section {
+  width: 100%;
+  padding: 80px 20px;
+  background-color: #f5f5f5;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  margin: 0;
+}
+
+.section-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  margin-bottom: 60px;
+  color: #1a1a1a;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  text-align: center;
+  width: 100%;
+}
+
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 30px;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.role-card {
+  background: white;
+  padding: 40px 30px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.role-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.role-card h3 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: #667eea;
+  letter-spacing: -0.5px;
+}
+
+.role-card p {
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 25px;
+  color: #666;
+}
+
+.role-card ul {
+  list-style: none;
+  padding: 0;
+}
+
+.role-card li {
+  padding: 10px 0;
+  padding-left: 30px;
+  position: relative;
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.role-card li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #667eea;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+/* ==================== Q&A SECTION ==================== */
+.qa-section {
+  width: 100%;
+  padding: 80px 20px;
+  background-color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  margin: 0;
+}
+
+.qa-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 25px;
+  max-width: 1200px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 60px;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.qa-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f8 100%);
+  padding: 35px;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+  transition: all 0.3s ease;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.qa-card:hover {
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.12);
+}
+
+.qa-card h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #1a1a1a;
+}
+
+.qa-card p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #666;
+}
+
+.analytics-box {
+  background: white;
+  padding: 50px;
+  border-radius: 16px;
+  box-shadow: 0 5px 30px rgba(0, 0, 0, 0.08);
+  max-width: 1200px;
+  width: 100%;
+  border: 2px solid #667eea;
+  margin: 0 auto;
+}
+
+.analytics-box h3 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin-bottom: 40px;
+  text-align: center;
+  color: #1a1a1a;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 40px;
+  margin: 0 auto;
+  padding: 0;
+  width: 100%;
+}
+
+.stat {
   text-align: center;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.stat-number {
+  font-size: 2.8rem;
+  font-weight: 900;
+  color: #667eea;
+  line-height: 1;
+  margin-bottom: 15px;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+.stat-label {
+  font-size: 1rem;
+  color: #666;
+  font-weight: 600;
+}
+
+/* ==================== CONTACT SECTION ==================== */
+.contact-section {
+  width: 100%;
+  padding: 80px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f5f5f5;
+  margin: 0;
+}
+
+.contact-container {
+  width: 100%;
+  max-width: 900px;
+  background: white;
+  padding: 60px 50px;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  border: 2px solid #667eea;
+}
+
+.contact-text {
+  font-size: 1.2rem;
+  line-height: 1.8;
+  margin-bottom: 40px;
+  color: #666;
+  font-weight: 300;
+}
+
+.contact-buttons {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 50px;
+  flex-wrap: wrap;
+}
+
+.contact-info {
+  background: linear-gradient(135deg, #f5f7fa 0%, #f0f3f8 100%);
+  padding: 30px;
+  border-radius: 12px;
+  border-left: 4px solid #667eea;
+}
+
+.contact-info h3 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+  color: #1a1a1a;
+}
+
+.contact-info p {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #666;
+  margin: 10px 0;
+}
+
+/* ==================== BUTTON STYLES ==================== */
+.btn {
+  padding: 14px 40px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.btn-primary {
+  background-color: #667eea;
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:hover {
+  background-color: #5568d3;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-secondary:hover {
+  background-color: #667eea;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-large {
+  padding: 16px 50px;
+  font-size: 1.1rem;
+}
+
+/* ==================== RESPONSIVE DESIGN ==================== */
+@media (max-width: 1024px) {
+  .intro-container,
+  .contact-container {
+    padding: 50px 40px;
   }
-  to {
-    transform: rotate(360deg);
+
+  .role-card,
+  .qa-card {
+    padding: 30px;
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+@media (max-width: 768px) {
+  .intro-section,
+  .how-section,
+  .qa-section,
+  .contact-section {
+    padding: 60px 20px;
+  }
+
+  .intro-container,
+  .contact-container {
+    padding: 40px 30px;
+    border-radius: 16px;
+  }
+
+  .intro-title {
+    font-size: 2.5rem;
+  }
+
+  .section-title {
+    font-size: 2.2rem;
+    margin-bottom: 40px;
+  }
+
+  .intro-features {
+    gap: 15px;
+  }
+
+  .intro-feature {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+
+  .roles-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .role-card {
+    padding: 30px 25px;
+  }
+
+  .role-card h3 {
+    font-size: 1.4rem;
+  }
+
+  .qa-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .analytics-box {
+    padding: 40px 30px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 25px;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+  }
+
+  .contact-buttons {
+    flex-direction: column;
+  }
+
+  .btn,
+  .btn-large {
+    width: 100%;
+  }
+
+  .contact-text {
+    font-size: 1rem;
   }
 }
 
-.card {
-  padding: 2em;
-}
+@media (max-width: 480px) {
+  .intro-container,
+  .contact-container {
+    padding: 30px 20px;
+    border-radius: 12px;
+  }
 
-.read-the-docs {
-  color: #888;
-}
+  .intro-title {
+    font-size: 2rem;
+    margin-bottom: 20px;
+  }
 
-/* added styling*/
-body {
-  font-family: Arial, sans-serif;
-  background-color: #f7f7f7;
-  color: #333;
+  .intro-text {
+    font-size: 1rem;
+    margin-bottom: 25px;
+  }
+
+  .section-title {
+    font-size: 1.8rem;
+    margin-bottom: 30px;
+  }
+
+  .role-card {
+    padding: 25px 20px;
+  }
+
+  .role-card h3 {
+    font-size: 1.2rem;
+  }
+
+  .role-card p {
+    font-size: 0.9rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .stat-number {
+    font-size: 1.8rem;
+  }
+
+  .analytics-box h3 {
+    font-size: 1.6rem;
+  }
+
+  .contact-info {
+    padding: 20px;
+  }
+
+  .contact-info h3 {
+    font-size: 1.1rem;
+  }
+
+  .contact-info p {
+    font-size: 0.9rem;
+  }
 }
-input, button {
-  margin: 5px;
-  padding: 8px;
-} 

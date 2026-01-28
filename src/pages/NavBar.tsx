@@ -71,6 +71,11 @@ export default function Navbar() {
             </NavLink>
           </>
         )}
+
+        {/* === IMPRESSUM (Für alle) === */}
+        <NavLink to="/impressum" className={({ isActive }) => (isActive ? "active" : "")}>
+          Impressum
+        </NavLink>
       </div>
 
       {/* Logout Button */}
